@@ -31,4 +31,8 @@ func TestServer(t *testing.T) {
 	resp, err = http.Get(server.URL)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	resp, err = http.Get(server.URL + "/healthz")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 }

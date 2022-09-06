@@ -52,6 +52,10 @@ func New(options *Options) *API {
 		httpapi.WriteBytes(rw, http.StatusOK, []byte("Marketplace is running"))
 	})
 
+	r.Get("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+		httpapi.WriteBytes(rw, http.StatusOK, []byte("API server running"))
+	})
+
 	return &API{
 		Handler: r,
 	}

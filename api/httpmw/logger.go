@@ -21,6 +21,11 @@ func Logger(log slog.Logger) func(next http.Handler) http.Handler {
 
 			next.ServeHTTP(sw, r)
 
+			// Do not log successful health check requests.
+			if r.URL.Path == "/healthz" && sw.Status == 200 {
+				return
+			}
+
 			httplog = httplog.With(
 				slog.F("took", time.Since(start)),
 				slog.F("status_code", sw.Status),
