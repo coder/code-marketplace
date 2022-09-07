@@ -17,6 +17,8 @@ func Logger(log slog.Logger) func(next http.Handler) http.Handler {
 			httplog := log.With(
 				slog.F("path", r.URL.Path),
 				slog.F("remote_addr", r.RemoteAddr),
+				slog.F("client_id", r.Header.Get("x-market-client-id")),
+				slog.F("user_id", r.Header.Get("x-market-user-id")),
 			)
 
 			next.ServeHTTP(sw, r)

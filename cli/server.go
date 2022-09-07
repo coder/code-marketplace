@@ -16,6 +16,7 @@ import (
 	"cdr.dev/slog/sloggers/sloghuman"
 
 	"github.com/coder/code-marketplace/api"
+	"github.com/coder/code-marketplace/database"
 )
 
 func server() *cobra.Command {
@@ -58,8 +59,12 @@ func server() *cobra.Command {
 
 			// Start the API server.
 			mapi := api.New(&api.Options{
-				Logger: logger,
+				Database: &database.NoDB{
+					ExtDir: extdir,
+					Logger: logger,
+				},
 				ExtDir: extdir,
+				Logger: logger,
 			})
 			server := &http.Server{
 				Handler: mapi.Handler,
