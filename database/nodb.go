@@ -25,11 +25,6 @@ type NoDB struct {
 }
 
 func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL url.URL) (string, error) {
-	reader, err := os.Open(filepath.Join(db.ExtDir, asset.Publisher, asset.Extension, asset.Version, "extension.vsixmanifest"))
-	if err != nil {
-		return "", err
-	}
-
 	fileBase := (&url.URL{
 		Scheme: baseURL.Scheme,
 		Host:   baseURL.Host,
@@ -47,6 +42,11 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 	switch asset.Type {
 	case ExtensionAssetType:
 		return fileBase + "/" + asset.Publisher + "." + asset.Extension + "-" + asset.Version + ".vsix", nil
+	}
+
+	reader, err := os.Open(filepath.Join(db.ExtDir, asset.Publisher, asset.Extension, asset.Version, "extension.vsixmanifest"))
+	if err != nil {
+		return "", err
 	}
 
 	manifest, err := parseVSIXManifest(reader)
