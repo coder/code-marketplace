@@ -124,6 +124,12 @@ func New(options *Options) *API {
 	// ignores the VSIX asset URL provided to VS Code in the response.
 	r.Get("/publishers/{publisher}/vsextensions/{extension}/{version}/{type}", api.assetRedirect)
 
+	// This is the URL you get taken to when you click the extension's names,
+	// ratings, etc from the extension details page.
+	r.Get("/item", func(rw http.ResponseWriter, r *http.Request) {
+		httpapi.WriteBytes(rw, http.StatusOK, []byte("Extension pages are not supported"))
+	})
+
 	return api
 }
 

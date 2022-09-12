@@ -245,6 +245,11 @@ func TestAPI(t *testing.T) {
 			Status:   http.StatusMovedPermanently,
 			Response: "/files/publisher/extension/version/extension.vsix",
 		},
+		{
+			Name:   "Item",
+			Path:   "/item",
+			Status: http.StatusOK,
+		},
 	}
 
 	extdir := filepath.Join(t.TempDir(), "extensions")
