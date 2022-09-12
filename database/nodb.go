@@ -197,17 +197,13 @@ func getMatches(extension *noDBExtension, filter Filter) (bool, []int) {
 				parts := strings.SplitN(token, ":", 2)
 				if len(parts) == 2 && parts[0] == "publisher" {
 					match(strings.EqualFold(extension.Publisher.PublisherName, strings.Trim(parts[1], "\"")))
-				} else {
+				} else if token != "" {
 					searchTokens = append(searchTokens, token)
 				}
 			}
 			candidates := []string{extension.Name, extension.Publisher.PublisherName, extension.ShortDescription}
 			allMatches := fuzzy.Ranks{}
 			for _, token := range searchTokens {
-				token = strings.TrimSpace(token)
-				if token == "" {
-					continue
-				}
 				matches := fuzzy.RankFindFold(token, candidates)
 				if len(matches) == 0 {
 					// If even one token does not match all the matches are invalid.
