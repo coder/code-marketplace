@@ -230,6 +230,21 @@ func TestAPI(t *testing.T) {
 			Status:   http.StatusMovedPermanently,
 			Response: "/files/publisher/extension/version/foo",
 		},
+		{
+			Name:   "DownloadNotExist",
+			Path:   "/publishers/notexist/vsextensions/extension/version/vspackage",
+			Status: http.StatusNotFound,
+			Response: &httpapi.ErrorResponse{
+				Message: "Extension asset does not exist",
+				Detail:  "Please check the asset path",
+			},
+		},
+		{
+			Name:     "DownloadOK",
+			Path:     "/publishers/publisher/vsextensions/extension/version/vspackage",
+			Status:   http.StatusMovedPermanently,
+			Response: "/files/publisher/extension/version/extension.vsix",
+		},
 	}
 
 	extdir := filepath.Join(t.TempDir(), "extensions")

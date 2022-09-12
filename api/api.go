@@ -120,6 +120,10 @@ func New(options *Options) *API {
 	// types to get files.
 	r.Get("/assets/{publisher}/{extension}/{version}/{type}", api.assetRedirect)
 
+	// This is the "download manually" URL, which like /assets is hardcoded and
+	// ignores the VSIX asset URL provided to VS Code in the response.
+	r.Get("/publishers/{publisher}/vsextensions/{extension}/{version}/{type}", api.assetRedirect)
+
 	return api
 }
 
@@ -200,10 +204,14 @@ func (api *API) extensionQuery(rw http.ResponseWriter, r *http.Request) {
 func (api *API) assetRedirect(rw http.ResponseWriter, r *http.Request) {
 	// TODO: Asset URIs can contain a targetPlatform query variable.
 	baseURL := httpapi.RequestBaseURL(r, "/")
+	assetType := chi.URLParam(r, "type")
+	if assetType == "vspackage" {
+		assetType = database.ExtensionAssetType
+	}
 	url, err := api.Database.GetExtensionAssetPath(r.Context(), &database.Asset{
 		Extension: chi.URLParam(r, "extension"),
 		Publisher: chi.URLParam(r, "publisher"),
-		Type:      chi.URLParam(r, "type"),
+		Type:      assetType,
 		Version:   chi.URLParam(r, "version"),
 	}, baseURL)
 	if err != nil && os.IsNotExist(err) {
