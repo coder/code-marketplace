@@ -252,11 +252,8 @@ func TestAPI(t *testing.T) {
 		},
 	}
 
-	extdir := filepath.Join(t.TempDir(), "extensions")
-	err := os.MkdirAll(extdir, 0o755)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(extdir, "exists"), []byte("foobar"), 0o644)
+	extdir := t.TempDir()
+	err := os.WriteFile(filepath.Join(extdir, "exists"), []byte("foobar"), 0o644)
 	require.NoError(t, err)
 
 	for _, c := range cases {

@@ -112,7 +112,7 @@ func TestGetExtensionAssetPath(t *testing.T) {
 	baseURL, err := url.Parse(base)
 	require.NoError(t, err)
 
-	extdir := filepath.Join(t.TempDir(), "extensions")
+	extdir := t.TempDir()
 	scaffold(t, extdir)
 
 	db := database.NoDB{
@@ -179,7 +179,7 @@ func TestGetExtensions(t *testing.T) {
 	t.Parallel()
 
 	base := "test://cdr.dev/base"
-	extdir := filepath.Join(t.TempDir(), "extensions")
+	extdir := t.TempDir()
 	scaffold(t, extdir)
 
 	cases := []struct {
