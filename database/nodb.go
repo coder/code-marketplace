@@ -48,6 +48,7 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 	if err != nil {
 		return "", err
 	}
+	defer reader.Close()
 
 	manifest, err := parseVSIXManifest(reader)
 	if err != nil {
@@ -86,6 +87,7 @@ func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, ba
 				db.Logger.Error(ctx, "Unable to read extension manifest", slog.Error(err))
 				continue
 			}
+			defer reader.Close()
 
 			manifest, err := parseVSIXManifest(reader)
 			if err != nil {
@@ -353,6 +355,7 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 			db.Logger.Error(ctx, "Unable to read version manifest", slog.Error(err))
 			continue
 		}
+		defer reader.Close()
 
 		manifest, err := parseVSIXManifest(reader)
 		if err != nil {
