@@ -2,29 +2,32 @@ package database
 
 import (
 	"context"
-	"encoding/xml"
-	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
-	"golang.org/x/mod/semver"
 
 	"cdr.dev/slog"
+
+	"github.com/coder/code-marketplace/storage"
 )
 
-// NoDB implements Database.  It reads extensions directly off the disk then
-// filters, sorts, and paginates them.
+// NoDB implements Database.  It reads extensions directly off storage then
+// filters, sorts, and paginates them.  In other words, the file system is the
+// database.
 type NoDB struct {
-	// TODO: Abstract file storage for use with storage services like jFrog.
-	ExtDir string
-	Logger slog.Logger
+	Storage storage.Storage
+	Logger  slog.Logger
 }
 
 func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL url.URL) (string, error) {
+	manifest, err := db.Storage.Manifest(ctx, asset.Publisher, asset.Extension, asset.Version)
+	if err != nil {
+		return "", err
+	}
+
 	fileBase := (&url.URL{
 		Scheme: baseURL.Scheme,
 		Host:   baseURL.Host,
@@ -36,24 +39,6 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 			asset.Version,
 		}, "/"),
 	}).String()
-
-	// The extension asset has to be checked separately since it is not stored in
-	// the manifest.
-	switch asset.Type {
-	case ExtensionAssetType:
-		return fileBase + "/" + asset.Publisher + "." + asset.Extension + "-" + asset.Version + ".vsix", nil
-	}
-
-	reader, err := os.Open(filepath.Join(db.ExtDir, asset.Publisher, asset.Extension, asset.Version, "extension.vsixmanifest"))
-	if err != nil {
-		return "", err
-	}
-	defer reader.Close()
-
-	manifest, err := parseVSIXManifest(reader)
-	if err != nil {
-		return "", err
-	}
 
 	for _, a := range manifest.Assets.Asset {
 		if a.Addressable == "true" && a.Type == asset.Type {
@@ -67,41 +52,17 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, baseURL url.URL) ([]*Extension, int, error) {
 	vscodeExts := []*noDBExtension{}
 
-	for _, publisher := range db.getDirNames(ctx, db.ExtDir) {
-		ctx := slog.With(ctx, slog.F("publisher", publisher))
-		dir := filepath.Join(db.ExtDir, publisher)
-
-		for _, extension := range db.getDirNames(ctx, dir) {
-			ctx := slog.With(ctx, slog.F("extension", extension))
-			dir := filepath.Join(db.ExtDir, publisher, extension)
-
-			versions := db.getDirNames(ctx, dir)
-			sort.Sort(sort.Reverse(semver.ByVersion(versions)))
-			if len(versions) == 0 {
-				continue
-			}
-
-			// The manifest from the latest version is used for filtering.
-			reader, err := os.Open(filepath.Join(dir, versions[0], "extension.vsixmanifest"))
-			if err != nil {
-				db.Logger.Error(ctx, "Unable to read extension manifest", slog.Error(err))
-				continue
-			}
-			defer reader.Close()
-
-			manifest, err := parseVSIXManifest(reader)
-			if err != nil {
-				db.Logger.Error(ctx, "Unable to parse extension manifest", slog.Error(err))
-				continue
-			}
-
-			vscodeExt := convertManifestToExtension(manifest)
-			if matched, distances := getMatches(vscodeExt, filter); matched {
-				vscodeExt.versions = versions
-				vscodeExt.distances = distances
-				vscodeExts = append(vscodeExts, vscodeExt)
-			}
+	err := db.Storage.WalkExtensions(ctx, func(manifest *storage.VSIXManifest, versions []string) error {
+		vscodeExt := convertManifestToExtension(manifest)
+		if matched, distances := getMatches(vscodeExt, filter); matched {
+			vscodeExt.versions = versions
+			vscodeExt.distances = distances
+			vscodeExts = append(vscodeExts, vscodeExt)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
 	total := len(vscodeExts)
@@ -128,21 +89,6 @@ func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, ba
 		})
 	}
 	return convertedExts, total, nil
-}
-
-func (db *NoDB) getDirNames(ctx context.Context, dir string) []string {
-	files, err := os.ReadDir(dir)
-	names := []string{}
-	if err != nil {
-		db.Logger.Error(ctx, "Error while reading publisher", slog.Error(err))
-		// No return since ReadDir may still have returned files.
-	}
-	for _, file := range files {
-		if file.IsDir() {
-			names = append(names, file.Name())
-		}
-	}
-	return names
 }
 
 func getMatches(extension *noDBExtension, filter Filter) (bool, []int) {
@@ -345,19 +291,10 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 		versionStrs = []string{ext.versions[0]}
 	}
 
-	extdir := filepath.Join(db.ExtDir, ext.Publisher.PublisherName, ext.Name)
-
 	versions := []ExtVersion{}
 	for _, versionStr := range versionStrs {
 		ctx := slog.With(ctx, slog.F("version", versionStr))
-		reader, err := os.Open(filepath.Join(extdir, versionStr, "extension.vsixmanifest"))
-		if err != nil {
-			db.Logger.Error(ctx, "Unable to read version manifest", slog.Error(err))
-			continue
-		}
-		defer reader.Close()
-
-		manifest, err := parseVSIXManifest(reader)
+		manifest, err := db.Storage.Manifest(ctx, ext.Publisher.PublisherName, ext.Name, versionStr)
 		if err != nil {
 			db.Logger.Error(ctx, "Unable to parse version manifest", slog.Error(err))
 			continue
@@ -381,13 +318,6 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 					versionStr,
 				}, "/"),
 			}).String()
-
-			// The extension asset has to be added separately since it is not stored in
-			// the manifest.
-			version.Files = []ExtFile{ExtFile{
-				Type:   ExtensionAssetType,
-				Source: fileBase + "/" + ext.Publisher.PublisherName + "." + ext.Name + "-" + versionStr + ".vsix",
-			}}
 			for _, asset := range manifest.Assets.Asset {
 				if asset.Addressable != "true" {
 					continue
@@ -429,19 +359,6 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 	return versions
 }
 
-func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
-	var vm *VSIXManifest
-
-	decoder := xml.NewDecoder(reader)
-	decoder.Strict = false
-	err := decoder.Decode(&vm)
-	if err != nil {
-		return nil, err
-	}
-
-	return vm, nil
-}
-
 // noDBExtension adds some properties for internally filtering.
 type noDBExtension struct {
 	Extension
@@ -451,7 +368,7 @@ type noDBExtension struct {
 	versions []string `json:"-"`
 }
 
-func convertManifestToExtension(manifest *VSIXManifest) *noDBExtension {
+func convertManifestToExtension(manifest *storage.VSIXManifest) *noDBExtension {
 	return &noDBExtension{
 		Extension: Extension{
 			// Normally this is a GUID but in the absence of a database just put

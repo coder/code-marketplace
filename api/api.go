@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"github.com/coder/code-marketplace/api/httpapi"
 	"github.com/coder/code-marketplace/api/httpmw"
 	"github.com/coder/code-marketplace/database"
+	"github.com/coder/code-marketplace/storage"
 )
 
 // QueryRequest implements an untyped object.  It is the data sent to the API to
@@ -54,11 +54,10 @@ type ResultMetadataItem struct {
 
 type Options struct {
 	Database database.Database
-	// TODO: Abstract file storage for use with storage services like jFrog.
-	ExtDir string
-	Logger slog.Logger
+	Logger   slog.Logger
 	// Set to <0 to disable.
 	RateLimit int
+	Storage   storage.Storage
 }
 
 type API struct {
@@ -112,12 +111,11 @@ func New(options *Options) *API {
 	r.Post("/api/extensionquery", api.extensionQuery)
 
 	// Endpoint for getting an extension's files or the extension zip.
-	options.Logger.Info(context.Background(), "Serving files", slog.F("dir", options.ExtDir))
-	r.Mount("/files", http.StripPrefix("/files", http.FileServer(http.Dir(options.ExtDir))))
+	r.Mount("/files", http.StripPrefix("/files", options.Storage.FileServer()))
 
 	// VS Code can use the files in the response to get file paths but it will
-	// sometimes ignore that and use use requests to /assets with hardcoded
-	// types to get files.
+	// sometimes ignore that and use requests to /assets with hardcoded types to
+	// get files.
 	r.Get("/assets/{publisher}/{extension}/{version}/{type}", api.assetRedirect)
 
 	// This is the "download manually" URL, which like /assets is hardcoded and
@@ -212,7 +210,7 @@ func (api *API) assetRedirect(rw http.ResponseWriter, r *http.Request) {
 	baseURL := httpapi.RequestBaseURL(r, "/")
 	assetType := chi.URLParam(r, "type")
 	if assetType == "vspackage" {
-		assetType = database.ExtensionAssetType
+		assetType = storage.VSIXAssetType
 	}
 	url, err := api.Database.GetExtensionAssetPath(r.Context(), &database.Asset{
 		Extension: chi.URLParam(r, "extension"),

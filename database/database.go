@@ -130,8 +130,6 @@ type ExtVersion struct {
 	TargetPlatform   string        `json:"targetPlatform,omitempty"`
 }
 
-const ExtensionAssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
-
 // ExtFile implements IRawGalleryExtensionFile.
 // https://github.com/microsoft/vscode/blob/29234f0219bdbf649d6107b18651a1038d6357ac/src/vs/platform/extensionManagement/common/extensionGalleryService.ts#L32-L35
 type ExtFile struct {
@@ -151,70 +149,6 @@ type ExtProperty struct {
 type ExtStat struct {
 	StatisticName string  `json:"statisticName"`
 	Value         float32 `json:"value"`
-}
-
-// VSIXManifest implement XMLManifest.PackageManifest.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L9-L26
-type VSIXManifest struct {
-	Metadata     VSIXMetadata
-	Installation struct {
-		InstallationTarget struct {
-			ID string `xml:"Id,attr"`
-		}
-	}
-	Dependencies []string
-	Assets       VSIXAssets
-}
-
-// VSIXManifest implement XMLManifest.PackageManifest.Metadata.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L11-L22
-type VSIXMetadata struct {
-	Description  string
-	DisplayName  string
-	Identity     VSIXIdentity
-	Tags         string
-	GalleryFlags string
-	License      string
-	Icon         string
-	Properties   VSIXProperties
-	Categories   string
-}
-
-// VSIXManifest implement XMLManifest.PackageManifest.Metadata.Identity.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L14
-type VSIXIdentity struct {
-	// ID correlates to ExtensionName, *not* ExtensionID.
-	ID             string `xml:"Id,attr"`
-	Version        string `xml:",attr"`
-	Publisher      string `xml:",attr"`
-	TargetPlatform string `xml:",attr"`
-}
-
-// VSIXProperties implements XMLManifest.PackageManifest.Metadata.Properties.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L19
-type VSIXProperties struct {
-	Property []VSIXProperty
-}
-
-// VSIXProperty implements XMLManifest.PackageManifest.Metadata.Properties.Property.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L19
-type VSIXProperty struct {
-	ID    string `xml:"Id,attr"`
-	Value string `xml:",attr"`
-}
-
-// VSIXAssets implements XMLManifest.PackageManifest.Assets.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L25
-type VSIXAssets struct {
-	Asset []VSIXAsset
-}
-
-// VSIXAsset implements XMLManifest.PackageManifest.Assets.Asset.
-// https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L25
-type VSIXAsset struct {
-	Type        string `xml:",attr"`
-	Path        string `xml:",attr"`
-	Addressable string `xml:",attr"`
 }
 
 type Asset struct {

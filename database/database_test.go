@@ -2,11 +2,10 @@ package database_test
 
 import (
 	"context"
-	"encoding/xml"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,95 +13,39 @@ import (
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/slogtest"
 	"github.com/coder/code-marketplace/database"
+	"github.com/coder/code-marketplace/storage"
+	"github.com/coder/code-marketplace/testutil"
 )
 
-func scaffold(t *testing.T, dir string) {
-	exts := []struct {
-		Publisher   string
-		Name        string
-		Tags        string
-		Files       []database.VSIXAsset
-		Properties  []database.VSIXProperty
-		Description string
-		Categories  string
-		Versions    []string
-	}{
-		{
-			Publisher:   "foo",
-			Name:        "zany",
-			Description: "foo bar baz qux",
-			Tags:        "tag1",
-			Categories:  "category1",
-			Files: []database.VSIXAsset{
-				{Type: "Microsoft.VisualStudio.Services.Icons.Default", Path: "icon.png", Addressable: "true"},
-				{Type: "Unaddressable", Path: "unaddressable.ext", Addressable: "false"},
-			},
-			Properties: []database.VSIXProperty{{ID: "property1", Value: "value1"}},
-			Versions:   []string{"1.0.0", "2.0.0", "3.0.0", "1.5.2", "2.2.2"},
-		},
-		{
-			Publisher:   "foo",
-			Name:        "buz",
-			Description: "quix baz bar buz sitting",
-			Tags:        "tag2",
-			Categories:  "category2",
-			Versions:    []string{"version1"},
-		},
-		{
-			Publisher:   "bar",
-			Name:        "squigly",
-			Description: "squigly foo and more foo bar baz",
-			Tags:        "tag1,tag2",
-			Categories:  "category1,category2",
-			Versions:    []string{"version1", "version2"},
-		},
-		{
-			Publisher:   "fred",
-			Name:        "thud",
-			Description: "frobbles the frobnozzle",
-			Tags:        "tag3,tag4,tag5",
-			Categories:  "category1",
-			Versions:    []string{"version1", "version2"},
-		},
-		{
-			Publisher:   "qqqqqqqqqqq",
-			Name:        "qqqqq",
-			Description: "qqqqqqqqqqqqqqqqqqq",
-			Tags:        "qq,qqq,qqqq",
-			Categories:  "q",
-			Versions:    []string{"qqq", "q"},
-		},
-	}
-	for _, ext := range exts {
-		for _, ver := range ext.Versions {
-			dir := filepath.Join(dir, ext.Publisher, ext.Name, ver)
-			err := os.MkdirAll(dir, 0o755)
-			require.NoError(t, err)
+type memoryStorage struct{}
 
-			manifest, err := xml.Marshal(database.VSIXManifest{
-				Metadata: database.VSIXMetadata{
-					Identity: database.VSIXIdentity{
-						ID:        ext.Name,
-						Version:   ver,
-						Publisher: ext.Publisher,
-					},
-					Properties: database.VSIXProperties{
-						Property: ext.Properties,
-					},
-					Description: ext.Description,
-					Tags:        ext.Tags,
-					Categories:  ext.Categories,
-				},
-				Assets: database.VSIXAssets{
-					Asset: ext.Files,
-				},
-			})
-			require.NoError(t, err)
+func (s *memoryStorage) FileServer() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		http.Error(rw, "not implemented", http.StatusNotImplemented)
+	})
+}
 
-			err = os.WriteFile(filepath.Join(dir, "extension.vsixmanifest"), manifest, 0o644)
-			require.NoError(t, err)
+func (s *memoryStorage) Manifest(ctx context.Context, publisher, extension, version string) (*storage.VSIXManifest, error) {
+	for _, ext := range testutil.Extensions {
+		if ext.Publisher == publisher && ext.Name == extension {
+			for _, ver := range ext.Versions {
+				if ver == version {
+					return testutil.ConvertExtensionToManifest(ext, ver), nil
+				}
+			}
+			break
 		}
 	}
+	return nil, os.ErrNotExist
+}
+
+func (s *memoryStorage) WalkExtensions(ctx context.Context, fn func(manifest *storage.VSIXManifest, versions []string) error) error {
+	for _, ext := range testutil.Extensions {
+		if err := fn(testutil.ConvertExtensionToManifest(ext, ext.Versions[0]), ext.Versions); err != nil {
+			return nil
+		}
+	}
+	return nil
 }
 
 func TestGetExtensionAssetPath(t *testing.T) {
@@ -112,12 +55,10 @@ func TestGetExtensionAssetPath(t *testing.T) {
 	baseURL, err := url.Parse(base)
 	require.NoError(t, err)
 
-	extdir := t.TempDir()
-	scaffold(t, extdir)
-
+	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
 	db := database.NoDB{
-		ExtDir: extdir,
-		Logger: slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug),
+		Storage: &memoryStorage{},
+		Logger:  logger,
 	}
 
 	t.Run("NoExtension", func(t *testing.T) {
@@ -160,17 +101,6 @@ func TestGetExtensionAssetPath(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprintf("%s/files/foo/zany/1.0.0/icon.png", base), path)
 	})
-
-	t.Run("GetExtensionAsset", func(t *testing.T) {
-		path, err := db.GetExtensionAssetPath(context.Background(), &database.Asset{
-			Publisher: "foo",
-			Extension: "zany",
-			Type:      database.ExtensionAssetType,
-			Version:   "1.0.0",
-		}, *baseURL)
-		require.NoError(t, err)
-		require.Equal(t, fmt.Sprintf("%s/files/foo/zany/1.0.0/foo.zany-1.0.0.vsix", base), path)
-	})
 }
 
 type checkFunc func(t *testing.T, ext *database.Extension)
@@ -179,11 +109,9 @@ func TestGetExtensions(t *testing.T) {
 	t.Parallel()
 
 	base := "test://cdr.dev/base"
-	extdir := t.TempDir()
-	scaffold(t, extdir)
-
 	cases := []struct {
 		Name       string
+		WalkError  bool
 		ExtDir     string
 		Filter     database.Filter
 		Flags      database.Flag
@@ -193,21 +121,19 @@ func TestGetExtensions(t *testing.T) {
 	}{
 		{
 			Name:       "BadDir",
-			ExtDir:     extdir + "-invalid",
+			WalkError:  true,
 			Filter:     database.Filter{},
 			Extensions: []string{},
 			Count:      0,
 		},
 		{
 			Name:       "NoCriteria",
-			ExtDir:     extdir,
 			Filter:     database.Filter{},
 			Extensions: []string{},
 			Count:      0,
 		},
 		{
-			Name:   "Target",
-			ExtDir: extdir,
+			Name: "Target",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -218,8 +144,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "TargetAndExcludeUnpublished",
-			ExtDir: extdir,
+			Name: "TargetAndExcludeUnpublished",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{
 					{
@@ -236,8 +161,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "FirstPage",
-			ExtDir: extdir,
+			Name: "FirstPage",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -250,8 +174,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "SecondPage",
-			ExtDir: extdir,
+			Name: "SecondPage",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -264,8 +187,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "StartOutOfBounds",
-			ExtDir: extdir,
+			Name: "StartOutOfBounds",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -278,8 +200,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "EndOutOfBounds",
-			ExtDir: extdir,
+			Name: "EndOutOfBounds",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -292,8 +213,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "ByTag",
-			ExtDir: extdir,
+			Name: "ByTag",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Tag,
@@ -304,8 +224,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      2,
 		},
 		{
-			Name:   "ByID",
-			ExtDir: extdir,
+			Name: "ByID",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type: database.ExtensionID,
@@ -317,8 +236,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      1,
 		},
 		{
-			Name:   "ByCategory",
-			ExtDir: extdir,
+			Name: "ByCategory",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Category,
@@ -329,8 +247,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      2,
 		},
 		{
-			Name:   "ByName",
-			ExtDir: extdir,
+			Name: "ByName",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionName,
@@ -341,8 +258,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      1,
 		},
 		{
-			Name:   "ByNames",
-			ExtDir: extdir,
+			Name: "ByNames",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{
 					{
@@ -360,8 +276,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      2,
 		},
 		{
-			Name:   "MultipleCriterion",
-			ExtDir: extdir,
+			Name: "MultipleCriterion",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{
 					{
@@ -383,8 +298,7 @@ func TestGetExtensions(t *testing.T) {
 		},
 		{
 			// Not implemented.
-			Name:   "ByFeatured",
-			ExtDir: extdir,
+			Name: "ByFeatured",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type: database.Featured,
@@ -394,8 +308,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      0,
 		},
 		{
-			Name:   "BySearchTextRelevance",
-			ExtDir: extdir,
+			Name: "BySearchTextRelevance",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.SearchText,
@@ -407,8 +320,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      2,
 		},
 		{
-			Name:   "BySearchTextMultiple",
-			ExtDir: extdir,
+			Name: "BySearchTextMultiple",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.SearchText,
@@ -420,8 +332,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      4,
 		},
 		{
-			Name:   "BySearchTextMany",
-			ExtDir: extdir,
+			Name: "BySearchTextMany",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.SearchText,
@@ -433,8 +344,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      1,
 		},
 		{
-			Name:   "BySearchTextNoMatch",
-			ExtDir: extdir,
+			Name: "BySearchTextNoMatch",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.SearchText,
@@ -445,8 +355,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      0,
 		},
 		{
-			Name:   "BySearchTextOneMatch",
-			ExtDir: extdir,
+			Name: "BySearchTextOneMatch",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.SearchText,
@@ -457,8 +366,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      1,
 		},
 		{
-			Name:   "ByPublisher",
-			ExtDir: extdir,
+			Name: "ByPublisher",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.SearchText,
@@ -469,8 +377,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      2,
 		},
 		{
-			Name:   "TargetSortAscending",
-			ExtDir: extdir,
+			Name: "TargetSortAscending",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -484,8 +391,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "TargetSortPublisher",
-			ExtDir: extdir,
+			Name: "TargetSortPublisher",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.Target,
@@ -499,8 +405,7 @@ func TestGetExtensions(t *testing.T) {
 			Count:      5,
 		},
 		{
-			Name:   "IncludeVersions",
-			ExtDir: extdir,
+			Name: "IncludeVersions",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -520,8 +425,7 @@ func TestGetExtensions(t *testing.T) {
 			},
 		},
 		{
-			Name:   "IncludeFiles",
-			ExtDir: extdir,
+			Name: "IncludeFiles",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -536,16 +440,14 @@ func TestGetExtensions(t *testing.T) {
 				require.Len(t, ext.Versions, 5, "versions")
 				for _, version := range ext.Versions {
 					// Should ignore non-addressable files.
-					require.Len(t, version.Files, 2, "files")
-					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/foo.zany-%s.vsix", base, version.Version, version.Version), version.Files[0].Source)
-					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[1].Source)
+					require.Len(t, version.Files, 1, "files")
+					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[0].Source)
 					require.Empty(t, version.Properties, "properties")
 				}
 			},
 		},
 		{
-			Name:   "IncludeAssetURI",
-			ExtDir: extdir,
+			Name: "IncludeAssetURI",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -567,8 +469,7 @@ func TestGetExtensions(t *testing.T) {
 			},
 		},
 		{
-			Name:   "IncludeCategoriesAndTags",
-			ExtDir: extdir,
+			Name: "IncludeCategoriesAndTags",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -584,8 +485,7 @@ func TestGetExtensions(t *testing.T) {
 			},
 		},
 		{
-			Name:   "IncludeVersionProperties",
-			ExtDir: extdir,
+			Name: "IncludeVersionProperties",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -605,8 +505,7 @@ func TestGetExtensions(t *testing.T) {
 			},
 		},
 		{
-			Name:   "IncludeLatestVersionOnly",
-			ExtDir: extdir,
+			Name: "IncludeLatestVersionOnly",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -626,8 +525,7 @@ func TestGetExtensions(t *testing.T) {
 			},
 		},
 		{
-			Name:   "IncludeAll",
-			ExtDir: extdir,
+			Name: "IncludeAll",
 			Filter: database.Filter{
 				Criteria: []database.Criteria{{
 					Type:  database.ExtensionID,
@@ -641,9 +539,8 @@ func TestGetExtensions(t *testing.T) {
 				require.Len(t, ext.Tags, 1, "tags")
 				require.Len(t, ext.Versions, 5, "versions")
 				for _, version := range ext.Versions {
-					require.Len(t, version.Files, 2, "files")
-					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/foo.zany-%s.vsix", base, version.Version, version.Version), version.Files[0].Source)
-					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[1].Source)
+					require.Len(t, version.Files, 1, "files")
+					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[0].Source)
 					require.Len(t, version.Properties, 1, "properties")
 					require.Equal(t, version.AssetURI, version.FallbackAssetURI)
 				}
@@ -656,8 +553,8 @@ func TestGetExtensions(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			t.Parallel()
 			db := database.NoDB{
-				ExtDir: extdir,
-				Logger: slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug),
+				Storage: &memoryStorage{},
+				Logger:  slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug),
 			}
 			baseURL, err := url.Parse(base)
 			require.NoError(t, err)

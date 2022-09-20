@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/coder/code-marketplace/api"
 	"github.com/coder/code-marketplace/database"
+	"github.com/coder/code-marketplace/storage"
 )
 
 func server() *cobra.Command {
@@ -57,14 +59,28 @@ func server() *cobra.Command {
 			}
 			logger.Info(ctx, "Starting API server", slog.F("address", tcpAddr))
 
-			// Start the API server.
-			mapi := api.New(&api.Options{
-				Database: &database.NoDB{
-					ExtDir: extdir,
-					Logger: logger,
-				},
+			extdir, err = filepath.Abs(extdir)
+			if err != nil {
+				return err
+			}
+
+			// Always local storage for now.
+			store := &storage.Local{
 				ExtDir: extdir,
 				Logger: logger,
+			}
+
+			// Always no database for now.
+			database := &database.NoDB{
+				Storage: store,
+				Logger:  logger,
+			}
+
+			// Start the API server.
+			mapi := api.New(&api.Options{
+				Database: database,
+				Storage:  store,
+				Logger:   logger,
 			})
 			server := &http.Server{
 				Handler: mapi.Handler,

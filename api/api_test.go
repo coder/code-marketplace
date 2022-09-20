@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,7 +21,28 @@ import (
 	"github.com/coder/code-marketplace/api"
 	"github.com/coder/code-marketplace/api/httpapi"
 	"github.com/coder/code-marketplace/database"
+	"github.com/coder/code-marketplace/storage"
 )
+
+type fakeStorage struct{}
+
+func (s *fakeStorage) FileServer() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/nonexistent" {
+			http.Error(rw, "not found", http.StatusNotFound)
+		} else {
+			_, _ = rw.Write([]byte("foobar"))
+		}
+	})
+}
+
+func (s *fakeStorage) Manifest(ctx context.Context, publisher, extension, version string) (*storage.VSIXManifest, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *fakeStorage) WalkExtensions(ctx context.Context, fn func(manifest *storage.VSIXManifest, versions []string) error) error {
+	return errors.New("not implemented")
+}
 
 type fakeDB struct {
 	exts []*database.Extension
@@ -36,7 +56,7 @@ func (db *fakeDB) GetExtensionAssetPath(ctx context.Context, asset *database.Ass
 		return "", os.ErrNotExist
 	}
 	assetPath := "foo"
-	if asset.Type == database.ExtensionAssetType {
+	if asset.Type == storage.VSIXAssetType {
 		assetPath = "extension.vsix"
 	}
 	return strings.Join([]string{baseURL.Path, "files", asset.Publisher, asset.Extension, asset.Version, assetPath}, "/"), nil
@@ -252,10 +272,6 @@ func TestAPI(t *testing.T) {
 		},
 	}
 
-	extdir := t.TempDir()
-	err := os.WriteFile(filepath.Join(extdir, "exists"), []byte("foobar"), 0o644)
-	require.NoError(t, err)
-
 	for _, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
@@ -264,7 +280,7 @@ func TestAPI(t *testing.T) {
 			logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
 			apiServer := api.New(&api.Options{
 				Database: &fakeDB{exts: exts},
-				ExtDir:   extdir,
+				Storage:  &fakeStorage{},
 				Logger:   logger,
 			})
 
