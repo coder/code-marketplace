@@ -5,8 +5,8 @@ Marketplace for use in editors like
 [code-server](https://github.com/cdr/code-server).
 
 This marketplace reads extensions from file storage and provides an API for
-editors to consume. It does not have a frontend or any mechanisms for adding or
-updating extensions in the marketplace.
+editors to consume. It does not have a frontend or any mechanisms for extension
+authors to add or update extensions in the marketplace.
 
 ## Deployment
 
@@ -26,34 +26,6 @@ reject connecting to the API.
 The `/healthz` endpoint can be used to determine if the marketplace is ready to
 receive requests.
 
-## File Storage
-
-Extensions must be both copied as a vsix and extracted to the following path:
-
-```
-<extensions-dir>/<publisher>/<extension name>/<version>/
-```
-
-For example:
-
-```
-extensions
-|-- ms-python
-|   `-- python
-|       `-- 2022.14.0
-|           |-- [Content_Types].xml
-|           |-- extension
-|           |-- extension.vsixmanifest
-|           `-- ms-python.python-2022.14.0.vsix
-`-- vscodevim
-    `-- vim
-        `-- 1.23.2
-            |-- [Content_Types].xml
-            |-- extension
-            |-- extension.vsixmanifest
-            `-- vscodevim.vim-1.23.2.vsix
-```
-
 ## Usage in code-server
 
 ```
@@ -72,7 +44,20 @@ or both the `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
 The marketplace does not support being hosted behind a base path; it must be
 proxied at the root of your domain.
 
-## Getting extensions
+## Adding extensions
+
+Extensions can be added to the marketplace by file or URL.  The extensions
+directory does not need to be created beforehand.
+
+```
+./code-marketplace add extension.vsix --extensions-dir ./extensions
+./code-marketplace add https://domain.tld/extension.vsix --extensions-dir ./extensions
+```
+
+Extensions listed as dependencies must also be added.
+
+If the extension is part of an extension pack the other extensions in the pack
+can also be added but doing so is optional.
 
 If an extension is open source you can get it from one of three locations:
 
@@ -80,23 +65,17 @@ If an extension is open source you can get it from one of three locations:
 2. Open VSX (if the extension is published to Open VSX).
 3. Building from source.
 
-For example to download the Python extension from Open VSX:
+For example to add the Python extension from Open VSX:
 
 ```
-mkdir -p extensions/ms-python/python/2022.14.0
-wget https://open-vsx.org/api/ms-python/python/2022.14.0/file/ms-python.python-2022.14.0.vsix
-unzip ms-python.python-2022.14.0.vsix -d extensions/ms-python/python/2022.14.0
-mv ms-python.python-2022.14.0.vsix extensions/ms-python/python/2022.14.0
+./code-marketplace add https://open-vsx.org/api/ms-python/python/2022.14.0/file/ms-python.python-2022.14.0.vsix --extensions-dir ./extensions
 ```
 
-Make sure to both extract the contents *and* copy/move the `.vsix` file.
+Or the Vim extension from GitHub:
 
-If an extension has dependencies those must be added as well.  An extension's
-dependencies can be found in the extension's `package.json` under
-`extensionDependencies`.
-
-Extensions under `extensionPack` in the extension's `package.json` can be added
-as well although doing so is not required.
+```
+./code-marketplace add https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix --extensions-dir ./extensions
+```
 
 ## Development
 

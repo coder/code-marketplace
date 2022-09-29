@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
+
+	"golang.org/x/xerrors"
 )
 
 const VSIXAssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
@@ -76,6 +80,10 @@ type VSIXAsset struct {
 
 // TODO: Add Artifactory implementation of Storage.
 type Storage interface {
+	// AddExtension adds the extension found at the specified source by copying it
+	// into the extension storage directory and returns the location of the new
+	// extension.  The source may be an URI or a local file path.
+	AddExtension(ctx context.Context, source string) (string, error)
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
 	FileServer() http.Handler
@@ -111,4 +119,45 @@ func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
 	})
 
 	return vm, nil
+}
+
+// validateManifest checks a manifest for issues.
+func validateManifest(manifest *VSIXManifest) error {
+	if manifest == nil {
+		return xerrors.Errorf("vsix did not contain a manifest")
+	}
+	identity := manifest.Metadata.Identity
+	if identity.Publisher == "" {
+		return xerrors.Errorf("manifest did not contain a publisher")
+	} else if identity.ID == "" {
+		return xerrors.Errorf("manifest did not contain an ID")
+	} else if identity.Version == "" {
+		return xerrors.Errorf("manifest did not contain a version")
+	}
+
+	return nil
+}
+
+// readVSIX reads the bytes of a VSIX from the specified source.  The source
+// might be a URI or a local file path.
+func readVSIX(ctx context.Context, source string) ([]byte, error) {
+	if !strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://") {
+		// Assume it is a local file path.
+		return os.ReadFile(source)
+	}
+
+	resp, err := http.Get(source)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		return nil, xerrors.Errorf("error retrieving vsix: status code %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(&io.LimitedReader{
+		R: resp.Body,
+		N: 100 * 1000 * 1000, // 100 MB
+	})
 }

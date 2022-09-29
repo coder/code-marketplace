@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +19,10 @@ import (
 )
 
 type memoryStorage struct{}
+
+func (s *memoryStorage) AddExtension(ctx context.Context, source string) (string, error) {
+	return "", errors.New("not implemented")
+}
 
 func (s *memoryStorage) FileServer() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {

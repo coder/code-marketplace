@@ -1,7 +1,10 @@
 package storage
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +19,57 @@ import (
 type Local struct {
 	ExtDir string
 	Logger slog.Logger
+}
+
+func (s *Local) AddExtension(ctx context.Context, source string) (string, error) {
+	vsixBytes, err := readVSIX(ctx, source)
+	if err != nil {
+		return "", err
+	}
+
+	mr, err := GetZipFileReader(vsixBytes, "extension.vsixmanifest")
+	if err != nil {
+		return "", err
+	}
+	defer mr.Close()
+
+	manifest, err := parseVSIXManifest(mr)
+	if err != nil {
+		return "", err
+	}
+
+	err = validateManifest(manifest)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract the zip to the correct path.
+	identity := manifest.Metadata.Identity
+	dir := filepath.Join(s.ExtDir, identity.Publisher, identity.ID, identity.Version)
+	err = ExtractZip(vsixBytes, func(name string) (io.Writer, error) {
+		path := filepath.Join(dir, name)
+		err := os.MkdirAll(filepath.Dir(path), 0o755)
+		if err != nil {
+			return nil, err
+		}
+		return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	})
+	if err != nil {
+		return "", nil
+	}
+
+	// Copy the VSIX itself as well.
+	vsixName := fmt.Sprintf("%s.%s-%s.vsix", identity.Publisher, identity.ID, identity.Version)
+	dst, err := os.OpenFile(filepath.Join(dir, vsixName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return "", nil
+	}
+	_, err = io.Copy(dst, bytes.NewReader(vsixBytes))
+	if err != nil {
+		return "", nil
+	}
+
+	return dir, nil
 }
 
 func (s *Local) FileServer() http.Handler {

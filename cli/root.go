@@ -13,7 +13,7 @@ func Root() *cobra.Command {
 		Example:       "  marketplace server --extensions-dir /path/to/extensions",
 	}
 
-	cmd.AddCommand(server(), version())
+	cmd.AddCommand(add(), server(), version())
 
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 

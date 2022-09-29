@@ -26,6 +26,10 @@ import (
 
 type fakeStorage struct{}
 
+func (s *fakeStorage) AddExtension(ctx context.Context, source string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
 func (s *fakeStorage) FileServer() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/nonexistent" {

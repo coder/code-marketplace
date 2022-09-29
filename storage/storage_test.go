@@ -1,15 +1,19 @@
 package storage_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -183,5 +187,187 @@ func TestWalkExtensions(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.ElementsMatch(t, expected, got)
+	})
+}
+
+type file struct {
+	name string
+	body []byte
+}
+
+func createVsix(manifest *storage.VSIXManifest) ([]byte, error) {
+	manifestBytes, err := xml.Marshal(manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	files := []file{{"icon.png", []byte("fake icon")}}
+	if manifest != nil {
+		files = append(files, file{"extension.vsixmanifest", manifestBytes})
+	}
+
+	buf := bytes.NewBuffer(nil)
+	zw := zip.NewWriter(buf)
+	for _, file := range files {
+		fw, err := zw.Create(file.name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write([]byte(file.body)); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func requireExtension(t *testing.T, ext testutil.Extension, extdir string, got string) {
+	expected := filepath.Join(extdir, ext.Publisher, ext.Name, ext.LatestVersion)
+	require.Equal(t, expected, got)
+
+	_, err := os.Stat(expected)
+	require.NoError(t, err)
+
+	vsixName := fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion)
+	_, err = os.Stat(filepath.Join(expected, vsixName))
+	require.NoError(t, err)
+}
+
+func TestAddExtension(t *testing.T) {
+	t.Parallel()
+
+	t.Run("HTTPOK", func(t *testing.T) {
+		t.Parallel()
+
+		ext := testutil.Extensions[0]
+		vsix, err := createVsix(testutil.ConvertExtensionToManifest(ext, ext.LatestVersion))
+		require.NoError(t, err)
+
+		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			_, err := rw.Write(vsix)
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		extdir := t.TempDir()
+		s := &storage.Local{ExtDir: extdir}
+
+		got, err := s.AddExtension(context.Background(), server.URL)
+		require.NoError(t, err)
+		requireExtension(t, ext, extdir, got)
+	})
+
+	t.Run("HTTPError", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			http.Error(rw, "something went wrong", http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		s := &storage.Local{ExtDir: t.TempDir()}
+
+		_, err := s.AddExtension(context.Background(), server.URL)
+		require.Error(t, err)
+
+		// The error should mention the status code.
+		require.Contains(t, err.Error(), strconv.Itoa(http.StatusInternalServerError))
+	})
+
+	t.Run("FileOK", func(t *testing.T) {
+		t.Parallel()
+
+		ext := testutil.Extensions[0]
+		vsix, err := createVsix(testutil.ConvertExtensionToManifest(ext, ext.LatestVersion))
+		require.NoError(t, err)
+
+		extdir := t.TempDir()
+		vsixPath := filepath.Join(extdir, "extension.vsix")
+		err = os.WriteFile(vsixPath, vsix, 0o644)
+		require.NoError(t, err)
+
+		s := &storage.Local{ExtDir: extdir}
+
+		got, err := s.AddExtension(context.Background(), vsixPath)
+		require.NoError(t, err)
+		requireExtension(t, ext, extdir, got)
+	})
+
+	t.Run("FileError", func(t *testing.T) {
+		t.Parallel()
+
+		extdir := t.TempDir()
+		s := &storage.Local{ExtDir: extdir}
+		_, err := s.AddExtension(context.Background(), filepath.Join(extdir, "foo.vsix"))
+		require.Error(t, err)
+	})
+
+	t.Run("InvalidManifest", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			error    string
+			manifest *storage.VSIXManifest
+			name     string
+		}{
+			{
+				error:    "not found",
+				name:     "Missing",
+				manifest: nil,
+			},
+			{
+				error:    "publisher",
+				name:     "MissingPublisher",
+				manifest: &storage.VSIXManifest{},
+			},
+			{
+				error: "ID",
+				name:  "MissingID",
+				manifest: &storage.VSIXManifest{
+					Metadata: storage.VSIXMetadata{
+						Identity: storage.VSIXIdentity{
+							Publisher: "foo",
+						},
+					},
+				},
+			},
+			{
+				error: "version",
+				name:  "MissingVersion",
+				manifest: &storage.VSIXManifest{
+					Metadata: storage.VSIXMetadata{
+						Identity: storage.VSIXIdentity{
+							Publisher: "foo",
+							ID:        "bar",
+						},
+					},
+				},
+			},
+		}
+
+		for _, test := range tests {
+			test := test
+			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
+				vsix, err := createVsix(test.manifest)
+				require.NoError(t, err)
+
+				extdir := t.TempDir()
+				vsixPath := filepath.Join(extdir, "extension.vsix")
+				err = os.WriteFile(vsixPath, vsix, 0o644)
+				require.NoError(t, err)
+
+				s := &storage.Local{ExtDir: extdir}
+
+				_, err = s.AddExtension(context.Background(), vsixPath)
+				require.Error(t, err)
+
+				// The error should mention what is wrong.
+				require.Contains(t, err.Error(), test.error)
+			})
+		}
 	})
 }
