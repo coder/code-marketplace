@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-Nothing to see here yet.
+### Added
+
+- `add` sub-command for adding extensions to the marketplace.
 
 ## [1.0.0](https://github.com/coder/code-marketplace/releases/tag/v1.0.0) - 2022-09-12
 
