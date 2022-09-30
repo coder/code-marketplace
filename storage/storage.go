@@ -102,6 +102,10 @@ type Storage interface {
 	// into the extension storage directory and returns details about the added
 	// extension.  The source may be an URI or a local file path.
 	AddExtension(ctx context.Context, source string) (*Extension, error)
+	// RemoveExtension removes the extension by id (publisher, name, and version)
+	// or all versions if all is true (in which case the id should omit the
+	// version) and returns the IDs removed.
+	RemoveExtension(ctx context.Context, name string, all bool) ([]string, error)
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
 	FileServer() http.Handler

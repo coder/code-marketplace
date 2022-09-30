@@ -3,17 +3,22 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
 	"golang.org/x/mod/semver"
+	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+
+	"github.com/coder/code-marketplace/util"
 )
 
 // Local implements Storage.  It stores extensions locally on disk.
@@ -85,6 +90,64 @@ func (s *Local) AddExtension(ctx context.Context, source string) (*Extension, er
 	}
 
 	return ext, nil
+}
+
+func (s *Local) RemoveExtension(ctx context.Context, id string, all bool) ([]string, error) {
+	re := regexp.MustCompile(`^([^.]+)\.([^-]+)-?(.*)$`)
+	match := re.FindAllStringSubmatch(id, -1)
+	if match == nil {
+		return nil, xerrors.Errorf("expected ID in the format <publisher>.<name> or <publisher>.<name>-<version> but got invalid ID \"%s\"", id)
+	}
+
+	// Get the directory to delete.
+	publisher := match[0][1]
+	extension := match[0][2]
+	version := match[0][3]
+	dir := filepath.Join(s.ExtDir, publisher, extension)
+	if !all {
+		dir = filepath.Join(dir, version)
+	}
+
+	// We could avoid an error if extensions already do not exist but since we are
+	// explicitly being asked to remove an extension the extension not being there
+	// to be removed could be considered an error.
+	_, err := os.Stat(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, xerrors.Errorf("%s does not exist", id)
+		}
+		return nil, err
+	}
+
+	allVersions := s.getDirNames(ctx, dir)
+	versionCount := len(allVersions)
+
+	// TODO: Probably should use a custom error instance since knowledge of --all
+	// is weird here.
+	if version != "" && all {
+		return nil, xerrors.Errorf("cannot specify both --all and version %s", version)
+	} else if version == "" && !all {
+		return nil, xerrors.Errorf(
+			"use %s-<version> to target a specific version or pass --all to delete %s of %s",
+			id,
+			util.Plural(versionCount, "version", ""),
+			id,
+		)
+	}
+
+	err = os.RemoveAll(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var versions []string
+	if all {
+		versions = allVersions
+	} else {
+		versions = []string{version}
+	}
+	sort.Sort(sort.Reverse(semver.ByVersion(versions)))
+	return versions, nil
 }
 
 func (s *Local) FileServer() http.Handler {

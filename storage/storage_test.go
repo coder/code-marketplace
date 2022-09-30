@@ -46,6 +46,7 @@ func TestFileServer(t *testing.T) {
 	require.Equal(t, "bar", string(body))
 }
 
+// addExtension adds the provided test extension to the provided directory..
 func addExtension(t *testing.T, ext testutil.Extension, extdir, version string) *storage.VSIXManifest {
 	dir := filepath.Join(extdir, ext.Publisher, ext.Name, version)
 	err := os.MkdirAll(dir, 0o755)
@@ -511,4 +512,118 @@ func TestAddExtension(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestRemoveExtension(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		all      bool
+		error    string
+		expected []string
+		name     string
+		remove   string
+	}{
+		{
+			name:     "OK",
+			expected: []string{"a"},
+			remove:   fmt.Sprintf("%s.%s-a", testutil.Extensions[0].Publisher, testutil.Extensions[0].Name),
+		},
+		{
+			name:   "NoVersionMatch",
+			error:  "does not exist",
+			remove: fmt.Sprintf("%s.%s-d", testutil.Extensions[0].Publisher, testutil.Extensions[0].Name),
+		},
+		{
+			name:   "NoPublisherMatch",
+			error:  "does not exist",
+			remove: "test-test.test-test",
+		},
+		{
+			name:   "NoExtensionMatch",
+			error:  "does not exist",
+			remove: "foo.test-test",
+		},
+		{
+			name:   "MultipleDots",
+			error:  "does not exist",
+			remove: "foo.bar-test.test",
+		},
+		{
+			name:   "EmptyID",
+			error:  "invalid ID",
+			remove: "",
+		},
+		{
+			name:   "MissingPublisher",
+			error:  "invalid ID",
+			remove: ".qux-bar",
+		},
+		{
+			name:   "MissingExtension",
+			error:  "invalid ID",
+			remove: "foo.-baz",
+		},
+		{
+			name:   "MissingExtensionAndVersion",
+			error:  "invalid ID",
+			remove: "foo.",
+		},
+		{
+			name:   "MissingPublisherAndVersion",
+			error:  "invalid ID",
+			remove: ".qux",
+		},
+		{
+			name:   "InvalidID",
+			error:  "invalid ID",
+			remove: "publisher-version",
+		},
+		{
+			name:   "MissingVersion",
+			error:  "target a specific version or pass --all",
+			remove: fmt.Sprintf("%s.%s", testutil.Extensions[0].Publisher, testutil.Extensions[0].Name),
+		},
+		{
+			name:     "All",
+			expected: []string{"a", "b", "c"},
+			all:      true,
+			remove:   fmt.Sprintf("%s.%s", testutil.Extensions[0].Publisher, testutil.Extensions[0].Name),
+		},
+		{
+			name:   "AllWithVersion",
+			error:  "cannot specify both",
+			all:    true,
+			remove: fmt.Sprintf("%s.%s-a", testutil.Extensions[0].Publisher, testutil.Extensions[0].Name),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			extdir := t.TempDir()
+			ext := testutil.Extensions[0]
+			addExtension(t, ext, extdir, "a")
+			addExtension(t, ext, extdir, "b")
+			addExtension(t, ext, extdir, "c")
+
+			ext = testutil.Extensions[1]
+			addExtension(t, ext, extdir, "a")
+			addExtension(t, ext, extdir, "b")
+			addExtension(t, ext, extdir, "c")
+
+			s := &storage.Local{ExtDir: extdir}
+
+			removed, err := s.RemoveExtension(context.Background(), test.remove, test.all)
+			if test.error != "" {
+				require.Error(t, err)
+				require.Regexp(t, test.error, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			require.ElementsMatch(t, test.expected, removed)
+		})
+	}
 }

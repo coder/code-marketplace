@@ -85,6 +85,16 @@ Or the Vim extension from GitHub:
 ./code-marketplace add https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix --extensions-dir ./extensions
 ```
 
+## Removing extensions
+
+Extensions can be removed from the marketplace by ID and version (or use `--all`
+to remove all versions).
+
+```
+./code-marketplace remove ms-python.python-2022.14.0 --extensions-dir ./extensions
+./code-marketplace remove ms-python.python --all --extensions-dir ./extensions
+```
+
 ## Usage in code-server
 
 ```

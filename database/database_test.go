@@ -24,6 +24,10 @@ func (s *memoryStorage) AddExtension(ctx context.Context, source string) (*stora
 	return nil, errors.New("not implemented")
 }
 
+func (s *memoryStorage) RemoveExtension(ctx context.Context, id string, all bool) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *memoryStorage) FileServer() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "not implemented", http.StatusNotImplemented)

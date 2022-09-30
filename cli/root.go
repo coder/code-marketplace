@@ -16,7 +16,7 @@ func Root() *cobra.Command {
 		}, "\n"),
 	}
 
-	cmd.AddCommand(add(), server(), version())
+	cmd.AddCommand(add(), remove(), server(), version())
 
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 

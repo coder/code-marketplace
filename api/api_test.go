@@ -30,6 +30,10 @@ func (s *fakeStorage) AddExtension(ctx context.Context, source string) (*storage
 	return nil, errors.New("not implemented")
 }
 
+func (s *fakeStorage) RemoveExtension(ctx context.Context, id string, all bool) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *fakeStorage) FileServer() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/nonexistent" {
