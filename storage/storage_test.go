@@ -195,14 +195,11 @@ type file struct {
 	body []byte
 }
 
-func createVsix(manifest *storage.VSIXManifest) ([]byte, error) {
-	manifestBytes, err := xml.Marshal(manifest)
-	if err != nil {
-		return nil, err
-	}
-
+// createVSIX returns the bytes for a VSIX file containing the provided manifest
+// and an icon.
+func createVSIX(manifestBytes []byte) ([]byte, error) {
 	files := []file{{"icon.png", []byte("fake icon")}}
-	if manifest != nil {
+	if manifestBytes != nil {
 		files = append(files, file{"extension.vsixmanifest", manifestBytes})
 	}
 
@@ -223,6 +220,8 @@ func createVsix(manifest *storage.VSIXManifest) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// requireExtension verifies an extension exists in the extension directory and
+// that the received output matches the expected path.
 func requireExtension(t *testing.T, ext testutil.Extension, extdir string, got string) {
 	expected := filepath.Join(extdir, ext.Publisher, ext.Name, ext.LatestVersion)
 	require.Equal(t, expected, got)
@@ -238,84 +237,191 @@ func requireExtension(t *testing.T, ext testutil.Extension, extdir string, got s
 func TestAddExtension(t *testing.T) {
 	t.Parallel()
 
-	t.Run("HTTPOK", func(t *testing.T) {
-		t.Parallel()
+	ext := testutil.Extensions[0]
+	manifestBytes, err := xml.Marshal(testutil.ConvertExtensionToManifest(ext, ext.LatestVersion))
+	require.NoError(t, err)
+	vsix, err := createVSIX(manifestBytes)
+	require.NoError(t, err)
 
-		ext := testutil.Extensions[0]
-		vsix, err := createVsix(testutil.ConvertExtensionToManifest(ext, ext.LatestVersion))
-		require.NoError(t, err)
-
-		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			_, err := rw.Write(vsix)
-			require.NoError(t, err)
-		}))
-		defer server.Close()
-
-		extdir := t.TempDir()
-		s := &storage.Local{ExtDir: extdir}
-
-		got, err := s.AddExtension(context.Background(), server.URL)
-		require.NoError(t, err)
-		requireExtension(t, ext, extdir, got)
-	})
-
-	t.Run("HTTPError", func(t *testing.T) {
-		t.Parallel()
-
-		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			http.Error(rw, "something went wrong", http.StatusInternalServerError)
-		}))
-		defer server.Close()
-
-		s := &storage.Local{ExtDir: t.TempDir()}
-
-		_, err := s.AddExtension(context.Background(), server.URL)
-		require.Error(t, err)
-
-		// The error should mention the status code.
-		require.Contains(t, err.Error(), strconv.Itoa(http.StatusInternalServerError))
-	})
-
-	t.Run("FileOK", func(t *testing.T) {
-		t.Parallel()
-
-		ext := testutil.Extensions[0]
-		vsix, err := createVsix(testutil.ConvertExtensionToManifest(ext, ext.LatestVersion))
-		require.NoError(t, err)
-
-		extdir := t.TempDir()
-		vsixPath := filepath.Join(extdir, "extension.vsix")
-		err = os.WriteFile(vsixPath, vsix, 0o644)
-		require.NoError(t, err)
-
-		s := &storage.Local{ExtDir: extdir}
-
-		got, err := s.AddExtension(context.Background(), vsixPath)
-		require.NoError(t, err)
-		requireExtension(t, ext, extdir, got)
-	})
-
-	t.Run("FileError", func(t *testing.T) {
-		t.Parallel()
-
-		extdir := t.TempDir()
-		s := &storage.Local{ExtDir: extdir}
-		_, err := s.AddExtension(context.Background(), filepath.Join(extdir, "foo.vsix"))
-		require.Error(t, err)
-	})
-
-	t.Run("InvalidManifest", func(t *testing.T) {
+	t.Run("HTTP", func(t *testing.T) {
 		t.Parallel()
 
 		tests := []struct {
-			error    string
-			manifest *storage.VSIXManifest
-			name     string
+			error   string
+			name    string
+			handler http.HandlerFunc
+			setup   func(extdir string) (string, error)
+		}{
+			{
+				name: "OK",
+			},
+			{
+				name:  "InternalError",
+				error: strconv.Itoa(http.StatusInternalServerError),
+				handler: func(rw http.ResponseWriter, r *http.Request) {
+					http.Error(rw, "something went wrong", http.StatusInternalServerError)
+				},
+			},
+			{
+				name:  "ReadError",
+				error: "unexpected EOF",
+				handler: func(rw http.ResponseWriter, r *http.Request) {
+					rw.Header().Set("Content-Length", "1")
+				},
+			},
+			{
+				name:  "InvalidZip",
+				error: "zip: not a valid zip file",
+				handler: func(rw http.ResponseWriter, r *http.Request) {
+					_, err := rw.Write([]byte{})
+					require.NoError(t, err)
+				},
+			},
+			{
+				name:  "ExtensionDirPerms",
+				error: "permission denied",
+				setup: func(extdir string) (string, error) {
+					// Disallow writing to the extension directory.
+					extdir = filepath.Join(extdir, "no-write")
+					return extdir, os.MkdirAll(extdir, 0o444)
+				},
+			},
+			{
+				name:  "CopyOverDirectory",
+				error: "is a directory",
+				setup: func(extdir string) (string, error) {
+					// Put a directory in the way of the vsix.
+					vsixName := fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion)
+					vsixPath := filepath.Join(extdir, ext.Publisher, ext.Name, ext.LatestVersion, vsixName)
+					return extdir, os.MkdirAll(vsixPath, 0o755)
+				},
+			},
+		}
+
+		for _, test := range tests {
+			test := test
+			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
+				handler := test.handler
+				if handler == nil {
+					handler = func(rw http.ResponseWriter, r *http.Request) {
+						_, err := rw.Write(vsix)
+						require.NoError(t, err)
+					}
+				}
+
+				server := httptest.NewServer(http.HandlerFunc(handler))
+				defer server.Close()
+
+				extdir := t.TempDir()
+				if test.setup != nil {
+					extdir, err = test.setup(extdir)
+					require.NoError(t, err)
+				}
+				s := &storage.Local{ExtDir: extdir}
+
+				got, err := s.AddExtension(context.Background(), server.URL)
+				if test.error != "" {
+					require.Error(t, err)
+					require.Regexp(t, test.error, err.Error())
+				} else {
+					requireExtension(t, ext, extdir, got)
+				}
+			})
+		}
+	})
+
+	t.Run("File", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			error  string
+			name   string
+			source func(extdir string) (string, error)
+		}{
+			{
+				name: "OK",
+				source: func(extdir string) (string, error) {
+					vsixPath := filepath.Join(extdir, "extension.vsix")
+					return vsixPath, os.WriteFile(vsixPath, vsix, 0o644)
+				},
+			},
+			{
+				name:  "NotFound",
+				error: "foo\\.vsix.+no such file",
+				source: func(extdir string) (string, error) {
+					return filepath.Join(extdir, "foo.vsix"), nil
+				},
+			},
+			{
+				name:  "EmptyFile",
+				error: "zip: not a valid zip file",
+				source: func(extdir string) (string, error) {
+					vsixPath := filepath.Join(extdir, "foo.vsix")
+					return vsixPath, os.WriteFile(vsixPath, []byte{}, 0o644)
+				},
+			},
+			{
+				name:  "Unreadable",
+				error: "permission denied",
+				source: func(extdir string) (string, error) {
+					vsixPath := filepath.Join(extdir, "extension.vsix")
+					return vsixPath, os.WriteFile(vsixPath, []byte{}, 0o222)
+				},
+			},
+		}
+
+		for _, test := range tests {
+			test := test
+			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
+				extdir := t.TempDir()
+				s := &storage.Local{ExtDir: extdir}
+
+				source, err := test.source(extdir)
+				require.NoError(t, err)
+
+				got, err := s.AddExtension(context.Background(), source)
+				if test.error != "" {
+					require.Error(t, err)
+					require.Regexp(t, test.error, err.Error())
+				} else {
+					requireExtension(t, ext, extdir, got)
+				}
+			})
+		}
+	})
+
+	t.Run("ValidateManifest", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			error         string
+			manifest      *storage.VSIXManifest
+			manifestBytes []byte
+			name          string
 		}{
 			{
 				error:    "not found",
 				name:     "Missing",
 				manifest: nil,
+			},
+			{
+				error:         "EOF",
+				name:          "Empty",
+				manifestBytes: []byte(""),
+			},
+			{
+				error:         "EOF",
+				name:          "TextFile",
+				manifestBytes: []byte("just some random text"),
+			},
+			{
+				error:         "XML syntax error",
+				name:          "SyntaxError",
+				manifestBytes: []byte("<PackageManifest/PackageManifest>"),
 			},
 			{
 				error:    "publisher",
@@ -352,7 +458,12 @@ func TestAddExtension(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
 
-				vsix, err := createVsix(test.manifest)
+				manifestBytes := test.manifestBytes
+				if manifestBytes == nil {
+					manifestBytes, err = xml.Marshal(test.manifest)
+					require.NoError(t, err)
+				}
+				vsix, err := createVSIX(manifestBytes)
 				require.NoError(t, err)
 
 				extdir := t.TempDir()
@@ -364,9 +475,7 @@ func TestAddExtension(t *testing.T) {
 
 				_, err = s.AddExtension(context.Background(), vsixPath)
 				require.Error(t, err)
-
-				// The error should mention what is wrong.
-				require.Contains(t, err.Error(), test.error)
+				require.Regexp(t, test.error, err.Error())
 			})
 		}
 	})

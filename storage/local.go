@@ -55,18 +55,18 @@ func (s *Local) AddExtension(ctx context.Context, source string) (string, error)
 		return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	})
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	// Copy the VSIX itself as well.
 	vsixName := fmt.Sprintf("%s.%s-%s.vsix", identity.Publisher, identity.ID, identity.Version)
 	dst, err := os.OpenFile(filepath.Join(dir, vsixName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	_, err = io.Copy(dst, bytes.NewReader(vsixBytes))
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return dir, nil
