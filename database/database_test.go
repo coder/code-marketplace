@@ -20,8 +20,8 @@ import (
 
 type memoryStorage struct{}
 
-func (s *memoryStorage) AddExtension(ctx context.Context, source string) (string, error) {
-	return "", errors.New("not implemented")
+func (s *memoryStorage) AddExtension(ctx context.Context, source string) (*storage.Extension, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (s *memoryStorage) FileServer() http.Handler {
@@ -505,7 +505,7 @@ func TestGetExtensions(t *testing.T) {
 				require.Len(t, ext.Versions, 5, "versions")
 				for _, version := range ext.Versions {
 					require.Empty(t, version.Files, "files")
-					require.Len(t, version.Properties, 1, "properties")
+					require.Len(t, version.Properties, 2, "properties")
 				}
 			},
 		},
@@ -546,7 +546,7 @@ func TestGetExtensions(t *testing.T) {
 				for _, version := range ext.Versions {
 					require.Len(t, version.Files, 1, "files")
 					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[0].Source)
-					require.Len(t, version.Properties, 1, "properties")
+					require.Len(t, version.Properties, 2, "properties")
 					require.Equal(t, version.AssetURI, version.FallbackAssetURI)
 				}
 			},

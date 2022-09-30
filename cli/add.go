@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -11,6 +12,7 @@ import (
 	"cdr.dev/slog/sloggers/sloghuman"
 
 	"github.com/coder/code-marketplace/storage"
+	"github.com/coder/code-marketplace/util"
 )
 
 func add() *cobra.Command {
@@ -46,13 +48,35 @@ func add() *cobra.Command {
 				Logger: logger,
 			}
 
-			dest, err := store.AddExtension(ctx, args[0])
+			ext, err := store.AddExtension(ctx, args[0])
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Extension unpacked to %s\n", dest)
-			return nil
+			depCount := len(ext.Dependencies)
+			summary := []string{
+				fmt.Sprintf("Unpacked %s to %s", ext.ID, ext.Location),
+				fmt.Sprintf("%s has %s", ext.ID, util.Plural(depCount, "dependency", "dependencies")),
+			}
+
+			if depCount > 0 {
+				for _, id := range ext.Dependencies {
+					summary = append(summary, fmt.Sprintf("  - %s", id))
+				}
+			}
+
+			packCount := len(ext.Pack)
+			if packCount > 0 {
+				summary = append(summary, fmt.Sprintf("%s is in a pack with %s", ext.ID, util.Plural(packCount, "other extension", "")))
+				for _, id := range ext.Pack {
+					summary = append(summary, fmt.Sprintf("  - %s", id))
+				}
+			} else {
+				summary = append(summary, fmt.Sprintf("%s is not in a pack", ext.ID))
+			}
+
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(summary, "\n"))
+			return err
 		},
 	}
 

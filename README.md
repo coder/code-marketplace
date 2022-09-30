@@ -63,10 +63,9 @@ directory does not need to be created beforehand.
 ./code-marketplace add https://domain.tld/extension.vsix --extensions-dir ./extensions
 ```
 
-Extensions listed as dependencies must also be added.
-
-If the extension is part of an extension pack the other extensions in the pack
-can also be added but doing so is optional.
+If the extension has dependencies or is in an extension pack those details will
+be printed.  Extensions listed as dependencies must also be added but extensions
+in a pack are optional.
 
 If an extension is open source you can get it from one of three locations:
 

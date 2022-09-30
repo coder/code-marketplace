@@ -14,6 +14,8 @@ type Extension struct {
 	Categories    string
 	Versions      []string
 	LatestVersion string
+	Dependencies  []string
+	Pack          []string
 }
 
 var Extensions = []Extension{
@@ -27,16 +29,37 @@ var Extensions = []Extension{
 			{Type: "Microsoft.VisualStudio.Services.Icons.Default", Path: "icon.png", Addressable: "true"},
 			{Type: "Unaddressable", Path: "unaddressable.ext", Addressable: "false"},
 		},
-		Properties:    []storage.VSIXProperty{{ID: "property1", Value: "value1"}},
+		Properties: []storage.VSIXProperty{
+			{
+				ID:    "Microsoft.VisualStudio.Code.ExtensionPack",
+				Value: "a.b,b.c",
+			},
+			{
+				ID:    "Microsoft.VisualStudio.Code.ExtensionDependencies",
+				Value: "d.e",
+			},
+		},
 		Versions:      []string{"1.0.0", "2.0.0", "3.0.0", "1.5.2", "2.2.2"},
 		LatestVersion: "3.0.0",
+		Dependencies:  []string{"d.e"},
+		Pack:          []string{"a.b", "b.c"},
 	},
 	{
-		Publisher:     "foo",
-		Name:          "buz",
-		Description:   "quix baz bar buz sitting",
-		Tags:          "tag2",
-		Categories:    "category2",
+		Publisher:   "foo",
+		Name:        "buz",
+		Description: "quix baz bar buz sitting",
+		Tags:        "tag2",
+		Categories:  "category2",
+		Properties: []storage.VSIXProperty{
+			{
+				ID:    "Microsoft.VisualStudio.Code.ExtensionPack",
+				Value: "",
+			},
+			{
+				ID:    "Microsoft.VisualStudio.Code.ExtensionDependencies",
+				Value: "",
+			},
+		},
 		Versions:      []string{"version1"},
 		LatestVersion: "version1",
 	},

@@ -12,8 +12,6 @@ import (
 	"golang.org/x/xerrors"
 )
 
-const VSIXAssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
-
 // VSIXManifest implement XMLManifest.PackageManifest.
 // https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L9-L26
 type VSIXManifest struct {
@@ -57,11 +55,18 @@ type VSIXProperties struct {
 	Property []VSIXProperty
 }
 
+type PropertyType string
+
+const (
+	DependencyPropertyType PropertyType = "Microsoft.VisualStudio.Code.ExtensionDependencies"
+	PackPropertyType       PropertyType = "Microsoft.VisualStudio.Code.ExtensionPack"
+)
+
 // VSIXProperty implements XMLManifest.PackageManifest.Metadata.Properties.Property.
 // https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L19
 type VSIXProperty struct {
-	ID    string `xml:"Id,attr"`
-	Value string `xml:",attr"`
+	ID    PropertyType `xml:"Id,attr"`
+	Value string       `xml:",attr"`
 }
 
 // VSIXAssets implements XMLManifest.PackageManifest.Assets.
@@ -70,20 +75,33 @@ type VSIXAssets struct {
 	Asset []VSIXAsset
 }
 
+type AssetType string
+
+const (
+	VSIXAssetType AssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
+)
+
 // VSIXAsset implements XMLManifest.PackageManifest.Assets.Asset.
 // https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L25
 type VSIXAsset struct {
-	Type        string `xml:",attr"`
-	Path        string `xml:",attr"`
-	Addressable string `xml:",attr"`
+	Type        AssetType `xml:",attr"`
+	Path        string    `xml:",attr"`
+	Addressable string    `xml:",attr"`
+}
+
+type Extension struct {
+	ID           string
+	Location     string
+	Dependencies []string
+	Pack         []string
 }
 
 // TODO: Add Artifactory implementation of Storage.
 type Storage interface {
 	// AddExtension adds the extension found at the specified source by copying it
-	// into the extension storage directory and returns the location of the new
+	// into the extension storage directory and returns details about the added
 	// extension.  The source may be an URI or a local file path.
-	AddExtension(ctx context.Context, source string) (string, error)
+	AddExtension(ctx context.Context, source string) (*Extension, error)
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
 	FileServer() http.Handler

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"golang.org/x/mod/semver"
 
@@ -21,26 +22,26 @@ type Local struct {
 	Logger slog.Logger
 }
 
-func (s *Local) AddExtension(ctx context.Context, source string) (string, error) {
+func (s *Local) AddExtension(ctx context.Context, source string) (*Extension, error) {
 	vsixBytes, err := readVSIX(ctx, source)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	mr, err := GetZipFileReader(vsixBytes, "extension.vsixmanifest")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer mr.Close()
 
 	manifest, err := parseVSIXManifest(mr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	err = validateManifest(manifest)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Extract the zip to the correct path.
@@ -55,21 +56,35 @@ func (s *Local) AddExtension(ctx context.Context, source string) (string, error)
 		return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Copy the VSIX itself as well.
-	vsixName := fmt.Sprintf("%s.%s-%s.vsix", identity.Publisher, identity.ID, identity.Version)
+	name := fmt.Sprintf("%s.%s-%s", identity.Publisher, identity.ID, identity.Version)
+	vsixName := fmt.Sprintf("%s.vsix", name)
 	dst, err := os.OpenFile(filepath.Join(dir, vsixName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	_, err = io.Copy(dst, bytes.NewReader(vsixBytes))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return dir, nil
+	ext := &Extension{ID: name, Location: dir}
+	for _, prop := range manifest.Metadata.Properties.Property {
+		if prop.Value == "" {
+			continue
+		}
+		switch prop.ID {
+		case DependencyPropertyType:
+			ext.Dependencies = append(ext.Dependencies, strings.Split(prop.Value, ",")...)
+		case PackPropertyType:
+			ext.Pack = append(ext.Pack, strings.Split(prop.Value, ",")...)
+		}
+	}
+
+	return ext, nil
 }
 
 func (s *Local) FileServer() http.Handler {

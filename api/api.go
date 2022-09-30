@@ -208,7 +208,7 @@ func (api *API) extensionQuery(rw http.ResponseWriter, r *http.Request) {
 func (api *API) assetRedirect(rw http.ResponseWriter, r *http.Request) {
 	// TODO: Asset URIs can contain a targetPlatform query variable.
 	baseURL := httpapi.RequestBaseURL(r, "/")
-	assetType := chi.URLParam(r, "type")
+	assetType := storage.AssetType(chi.URLParam(r, "type"))
 	if assetType == "vspackage" {
 		assetType = storage.VSIXAssetType
 	}

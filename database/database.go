@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/url"
 	"time"
+
+	"github.com/coder/code-marketplace/storage"
 )
 
 // API references:
@@ -133,15 +135,15 @@ type ExtVersion struct {
 // ExtFile implements IRawGalleryExtensionFile.
 // https://github.com/microsoft/vscode/blob/29234f0219bdbf649d6107b18651a1038d6357ac/src/vs/platform/extensionManagement/common/extensionGalleryService.ts#L32-L35
 type ExtFile struct {
-	Type   string `json:"assetType"`
-	Source string `json:"source"`
+	Type   storage.AssetType `json:"assetType"`
+	Source string            `json:"source"`
 }
 
 // ExtProperty implements IRawGalleryExtensionProperty.
 // https://github.com/microsoft/vscode/blob/29234f0219bdbf649d6107b18651a1038d6357ac/src/vs/platform/extensionManagement/common/extensionGalleryService.ts#L37-L40
 type ExtProperty struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   storage.PropertyType `json:"key"`
+	Value string               `json:"value"`
 }
 
 // ExtStat implements IRawGalleryExtensionStatistics.
@@ -154,7 +156,7 @@ type ExtStat struct {
 type Asset struct {
 	Extension string
 	Publisher string
-	Type      string
+	Type      storage.AssetType
 	Version   string
 }
 

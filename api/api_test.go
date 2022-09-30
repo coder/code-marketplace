@@ -26,8 +26,8 @@ import (
 
 type fakeStorage struct{}
 
-func (s *fakeStorage) AddExtension(ctx context.Context, source string) (string, error) {
-	return "", errors.New("not implemented")
+func (s *fakeStorage) AddExtension(ctx context.Context, source string) (*storage.Extension, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (s *fakeStorage) FileServer() http.Handler {
