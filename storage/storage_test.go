@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"testing"
@@ -261,6 +262,7 @@ func TestAddExtension(t *testing.T) {
 			handler  http.HandlerFunc
 			name     string
 			setup    func(extdir string) (string, error)
+			skip     bool
 		}{
 			{
 				name:     "OK",
@@ -297,8 +299,11 @@ func TestAddExtension(t *testing.T) {
 				},
 			},
 			{
-				name:     "ExtensionDirPerms",
-				error:    "permission denied",
+				name:  "ExtensionDirPerms",
+				error: "permission denied",
+				// It does not appear possible to create a directory that is not
+				// writable on Windows?
+				skip:     runtime.GOOS == "windows",
 				expected: testutil.Extensions[0],
 				setup: func(extdir string) (string, error) {
 					// Disallow writing to the extension directory.
@@ -324,6 +329,9 @@ func TestAddExtension(t *testing.T) {
 			test := test
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
+				if test.skip {
+					t.Skip()
+				}
 
 				handler := test.handler
 				if handler == nil {
@@ -362,10 +370,12 @@ func TestAddExtension(t *testing.T) {
 		t.Parallel()
 
 		tests := []struct {
-			error    string
-			expected testutil.Extension
-			name     string
-			source   func(extdir string) (string, error)
+			error     string
+			errorType error
+			expected  testutil.Extension
+			name      string
+			skip      bool
+			source    func(extdir string) (string, error)
 		}{
 			{
 				name:     "OK",
@@ -379,8 +389,8 @@ func TestAddExtension(t *testing.T) {
 				},
 			},
 			{
-				name:  "NotFound",
-				error: "foo\\.vsix.+no such file",
+				name:      "NotFound",
+				errorType: os.ErrNotExist,
 				source: func(extdir string) (string, error) {
 					return filepath.Join(extdir, "foo.vsix"), nil
 				},
@@ -396,6 +406,9 @@ func TestAddExtension(t *testing.T) {
 			{
 				name:  "Unreadable",
 				error: "permission denied",
+				// It does not appear possible to create a file that is not readable on
+				// Windows?
+				skip: runtime.GOOS == "windows",
 				source: func(extdir string) (string, error) {
 					vsixPath := filepath.Join(extdir, "extension.vsix")
 					return vsixPath, os.WriteFile(vsixPath, []byte{}, 0o222)
@@ -407,6 +420,9 @@ func TestAddExtension(t *testing.T) {
 			test := test
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
+				if test.skip {
+					t.Skip()
+				}
 
 				extdir := t.TempDir()
 				s := &storage.Local{ExtDir: extdir}
@@ -415,7 +431,10 @@ func TestAddExtension(t *testing.T) {
 				require.NoError(t, err)
 
 				got, err := s.AddExtension(context.Background(), source)
-				if test.error != "" {
+				if test.errorType != nil {
+					require.Error(t, err)
+					require.True(t, errors.Is(err, test.errorType))
+				} else if test.error != "" {
 					require.Error(t, err)
 					require.Regexp(t, test.error, err.Error())
 				} else {

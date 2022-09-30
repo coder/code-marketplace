@@ -52,7 +52,7 @@ func (s *Local) AddExtension(ctx context.Context, source string) (*Extension, er
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
 	dir := filepath.Join(s.ExtDir, identity.Publisher, identity.ID, identity.Version)
-	err = ExtractZip(vsixBytes, func(name string) (io.Writer, error) {
+	err = ExtractZip(vsixBytes, func(name string) (io.WriteCloser, error) {
 		path := filepath.Join(dir, name)
 		err := os.MkdirAll(filepath.Dir(path), 0o755)
 		if err != nil {
@@ -71,6 +71,7 @@ func (s *Local) AddExtension(ctx context.Context, source string) (*Extension, er
 	if err != nil {
 		return nil, err
 	}
+	defer dst.Close()
 	_, err = io.Copy(dst, bytes.NewReader(vsixBytes))
 	if err != nil {
 		return nil, err
@@ -159,6 +160,7 @@ func (s *Local) Manifest(ctx context.Context, publisher, extension, version stri
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 
 	return parseVSIXManifest(reader)
 }

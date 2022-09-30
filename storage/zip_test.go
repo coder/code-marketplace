@@ -55,6 +55,12 @@ func TestGetZipFileReader(t *testing.T) {
 	require.Error(t, err)
 }
 
+type nopCloser struct {
+	io.Writer
+}
+
+func (nopCloser) Close() error { return nil }
+
 func TestExtract(t *testing.T) {
 	t.Parallel()
 
@@ -62,7 +68,7 @@ func TestExtract(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Error", func(t *testing.T) {
-		err := ExtractZip(buffer, func(name string) (io.Writer, error) {
+		err := ExtractZip(buffer, func(name string) (io.WriteCloser, error) {
 			return nil, errors.New("error")
 		})
 		require.Error(t, err)
@@ -70,9 +76,9 @@ func TestExtract(t *testing.T) {
 
 	t.Run("OK", func(t *testing.T) {
 		called := []string{}
-		err := ExtractZip(buffer, func(name string) (io.Writer, error) {
+		err := ExtractZip(buffer, func(name string) (io.WriteCloser, error) {
 			called = append(called, name)
-			return io.Discard, nil
+			return nopCloser{io.Discard}, nil
 		})
 		require.NoError(t, err)
 		require.Equal(t, []string{"alpha.txt", "beta.txt", "charlie.txt"}, called)
