@@ -23,7 +23,11 @@ func add() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <source>",
 		Short: "Add an extension to the marketplace",
-		Args:  cobra.ExactArgs(1),
+		Example: strings.Join([]string{
+			"  marketplace add https://domain.tld/extension.vsix --extensions-dir ./extensions",
+			"  marketplace add extension.vsix --extensions-dir ./extensions",
+		}, "\n"),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()

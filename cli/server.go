@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,6 +31,9 @@ func server() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Start the Code extension marketplace",
+		Example: strings.Join([]string{
+			"  marketplace server --extensions-dir ./extensions",
+		}, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()

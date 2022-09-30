@@ -2,6 +2,7 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 func Root() *cobra.Command {
@@ -10,7 +11,9 @@ func Root() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Long:          "Code extension marketplace",
-		Example:       "  marketplace server --extensions-dir /path/to/extensions",
+		Example: strings.Join([]string{
+			"  marketplace server --extensions-dir ./extensions",
+		}, "\n"),
 	}
 
 	cmd.AddCommand(add(), server(), version())
