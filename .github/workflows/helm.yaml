@@ -1,0 +1,31 @@
+name: lint/helm
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "helm/**"
+      - ".github/workflows/helm.yaml"
+  pull_request:
+    paths:
+      - "helm/**"
+      - ".github/workflows/helm.yaml"
+  workflow_dispatch:
+
+# Cancel in-progress runs for pull requests when developers push
+# additional changes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: azure/setup-helm@v3.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: helm lint --strict ./helm
