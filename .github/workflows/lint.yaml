@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "**.go"
+      - ".github/workflows/lint.yaml"
   pull_request:
+    paths:
+      - "**.go"
+      - ".github/workflows/lint.yaml"
   workflow_dispatch:
 
 # Cancel in-progress runs for pull requests when developers push
