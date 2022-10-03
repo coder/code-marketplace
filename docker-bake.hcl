@@ -1,4 +1,4 @@
-variable "GITHUB_REF_NAME" {}
+variable "VERSION" {}
 
 group "default" {
   targets = ["code-marketplace"]
@@ -7,7 +7,7 @@ group "default" {
 target "code-marketplace" {
   dockerfile = "./Dockerfile"
   tags = [
-    "ghcr.io/coder/code-marketplace:${GITHUB_REF_NAME}",
+    "ghcr.io/coder/code-marketplace:${VERSION}",
   ]
   platforms = ["linux/amd64", "linux/arm64"]
 }
