@@ -13,6 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - uses: robinraju/release-downloader@v1.5
         with:
           repository: "coder/code-marketplace"
