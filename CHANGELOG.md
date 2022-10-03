@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `add` sub-command for adding extensions to the marketplace.
+- `remove` sub-command for removing extensions from the marketplace.
 
 ## [1.0.0](https://github.com/coder/code-marketplace/releases/tag/v1.0.0) - 2022-09-12
 
