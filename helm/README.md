@@ -18,8 +18,9 @@ You will need to configure `ingress` in [values.yaml](./values.yaml) to expose t
 marketplace on an external domain or change `service.type` to get yourself an
 external IP address.
 
-It is recommended to configure `ingress` with TLS because otherwise code-server
-will refuse to connect to the marketplace.
+It is recommended to configure `ingress` with TLS or put the external IP behind
+a TLS-terminating reverse proxy because code-server will refuse to connect to
+the marketplace if it is not behind HTTPS.
 
 More information can be found at these links:
 
