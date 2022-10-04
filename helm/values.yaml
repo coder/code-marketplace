@@ -84,5 +84,4 @@ tolerations: []
 affinity: {}
 
 persistence:
-  enabled: true
   size: 100Gi

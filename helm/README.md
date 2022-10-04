@@ -59,7 +59,7 @@ Specify values using `--set`:
 
 ```console
 $ helm upgrade --install code-marketplace ./helm-chart \
-  --set persistence.enabled=false
+  --set persistence.size=10Gi
 ```
 
 Or edit and use the YAML file:

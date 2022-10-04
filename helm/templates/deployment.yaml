@@ -25,12 +25,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "code-marketplace.serviceAccountName" . }}
-      {{- if .Values.persistence.enabled }}
       volumes:
         - name: extensions
           persistentVolumeClaim:
             claimName: {{ include "code-marketplace.fullname" . }}
-      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -48,11 +46,9 @@ spec:
             - 0.0.0.0:80
             - --extensions-dir
             - /extensions
-          {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: extensions
               mountPath: /extensions
-          {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
