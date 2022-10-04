@@ -14,6 +14,10 @@ The marketplace is a single binary. Deployment involves running the binary,
 pointing it to a directory of extensions, and exposing the binary's bound
 address in some way.
 
+### Kubernetes
+
+If deploying with Kubernetes see the [Helm directory](./helm) otherwise read on.
+
 ### Getting the binary
 
 The binary can be downloaded from GitHub releases. For example here is a way to

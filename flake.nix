@@ -13,6 +13,7 @@
               go_1_19
               golangci-lint
               gotestsum
+              kubernetes-helm
             ];
           };
         }
