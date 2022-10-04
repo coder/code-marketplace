@@ -1,4 +1,4 @@
-name: lint
+name: lint/go
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: test
+name: test/go
 
 on:
   push:
@@ -21,7 +21,6 @@ concurrency:
 
 jobs:
   test:
-    name: "test/go"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
