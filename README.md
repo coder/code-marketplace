@@ -42,12 +42,20 @@ Run `./code-marketplace --help` for a full list of options.
 ### Exposing the marketplace
 
 The marketplace must be put behind TLS otherwise code-server will reject
-connecting to the API. This could mean using a reverse proxy like NGINX or Caddy
-with your own domain and certificates or using a service like Cloudflare.
+connecting to the API. This could mean using a TLS-terminating reverse proxy
+like NGINX or Caddy with your own domain and certificates or using a service
+like Cloudflare.
 
 When hosting the marketplace behind a reverse proxy set either the `Forwarded`
-header or both the `X-Forwarded-Host` and `X-Forwarded-Proto` headers. These are
-used to generate absolute URLs to extension assets in API responses.
+header or both the `X-Forwarded-Host` and `X-Forwarded-Proto` headers. These
+headers are used to generate absolute URIs to extension assets in API responses.
+One way to test this is to make a query and check one of the URIs in the
+response:
+
+```
+$ curl 'https://example.com/api/extensionquery' -H 'Accept: application/json;api-version=3.0-preview.1' --compressed -H 'Content-Type: application/json' --data-raw '{"filters":[{"criteria":[{"filterType":8,"value":"Microsoft.VisualStudio.Code"}],"pageSize":1}],"flags":439}' | jq .results[0].extensions[0].versions[0].assetUri
+"https://example.com/assets/vscodevim/vim/1.24.1"
+```
 
 The marketplace does not support being hosted behind a base path; it must be
 proxied at the root of your domain.
