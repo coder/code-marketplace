@@ -33,7 +33,7 @@ default `ingress` already takes care of this). These headers are used to
 generate absolute URIs to extension assets in API responses. One way to test
 this is to make a query and check one of the URIs in the response:
 
-```
+```console
 $ curl 'https://example.com/api/extensionquery' -H 'Accept: application/json;api-version=3.0-preview.1' --compressed -H 'Content-Type: application/json' --data-raw '{"filters":[{"criteria":[{"filterType":8,"value":"Microsoft.VisualStudio.Code"}],"pageSize":1}],"flags":439}' | jq .results[0].extensions[0].versions[0].assetUri
 "https://example.com/assets/vscodevim/vim/1.24.1"
 ```
@@ -46,7 +46,7 @@ proxied at the root of your domain.
 One way to get extensions added or removed is to exec into the pod and use the
 marketplace binary to add and remove them.
 
-```
+```console
 export POD_NAME=$(kubectl get pods -l "app.kubernetes.io/name=code-marketplace,app.kubernetes.io/instance=code-marketplace" -o jsonpath="{.items[0].metadata.name}")
 $ kubectl exec -it "$POD_NAME" -- /opt/code-marketplace add https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix --extensions-dir /extensions
 ```

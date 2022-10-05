@@ -24,7 +24,7 @@ The binary can be downloaded from GitHub releases. For example here is a way to
 download the latest release using `wget`. Replace `$os` and `$arch` with your
 operating system and architecture.
 
-```
+```console
 wget https://github.com/coder/code-marketplace/releases/latest/download/code-marketplace-$os-$arch -O ./code-marketplace
 chmod +x ./code-marketplace
 ```
@@ -33,7 +33,7 @@ chmod +x ./code-marketplace
 
 The marketplace server can be ran using the `server` sub-command.
 
-```
+```console
 ./code-marketplace server --extensions-dir ./extensions
 ```
 
@@ -52,7 +52,7 @@ headers are used to generate absolute URIs to extension assets in API responses.
 One way to test this is to make a query and check one of the URIs in the
 response:
 
-```
+```console
 $ curl 'https://example.com/api/extensionquery' -H 'Accept: application/json;api-version=3.0-preview.1' --compressed -H 'Content-Type: application/json' --data-raw '{"filters":[{"criteria":[{"filterType":8,"value":"Microsoft.VisualStudio.Code"}],"pageSize":1}],"flags":439}' | jq .results[0].extensions[0].versions[0].assetUri
 "https://example.com/assets/vscodevim/vim/1.24.1"
 ```
@@ -70,7 +70,7 @@ receive requests.
 Extensions can be added to the marketplace by file or URL. The extensions
 directory does not need to be created beforehand.
 
-```
+```console
 ./code-marketplace add extension.vsix --extensions-dir ./extensions
 ./code-marketplace add https://domain.tld/extension.vsix --extensions-dir ./extensions
 ```
@@ -87,13 +87,13 @@ If an extension is open source you can get it from one of three locations:
 
 For example to add the Python extension from Open VSX:
 
-```
+```console
 ./code-marketplace add https://open-vsx.org/api/ms-python/python/2022.14.0/file/ms-python.python-2022.14.0.vsix --extensions-dir ./extensions
 ```
 
 Or the Vim extension from GitHub:
 
-```
+```console
 ./code-marketplace add https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix --extensions-dir ./extensions
 ```
 
@@ -102,14 +102,14 @@ Or the Vim extension from GitHub:
 Extensions can be removed from the marketplace by ID and version (or use `--all`
 to remove all versions).
 
-```
+```console
 ./code-marketplace remove ms-python.python-2022.14.0 --extensions-dir ./extensions
 ./code-marketplace remove ms-python.python --all --extensions-dir ./extensions
 ```
 
 ## Usage in code-server
 
-```
+```console
 export EXTENSIONS_GALLERY='{"serviceUrl":"https://<domain>/api", "itemUrl":"https://<domain>/item", "resourceUrlTemplate": "https://<domain>/files/{publisher}/{name}/{version}/{path}"}'
 code-server
 ```
@@ -119,7 +119,7 @@ marketplace is running behind an https URL.
 
 ## Development
 
-```
+```console
 make test
 mkdir -p extensions
 go run ./cmd/marketplace/main.go server --extensions-dir ./extensions
@@ -149,4 +149,3 @@ update the changelog as part of your PR.
 ## Planned work
 
 - jFrog integration for file storage.
-- Helm chart for deployment.
