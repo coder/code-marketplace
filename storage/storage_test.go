@@ -20,9 +20,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/mod/semver"
 
+	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/slogtest"
 	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/testutil"
 )
+
+func newStorage(t *testing.T, dir string) storage.Storage {
+	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
+	return storage.NewLocalStorage(context.Background(), dir, logger)
+}
 
 func TestFileServer(t *testing.T) {
 	t.Parallel()
@@ -32,7 +39,8 @@ func TestFileServer(t *testing.T) {
 	err := os.WriteFile(file, []byte("bar"), 0o644)
 	require.NoError(t, err)
 
-	server := (&storage.Local{ExtDir: dir}).FileServer()
+	s := newStorage(t, dir)
+	server := s.FileServer()
 
 	req := httptest.NewRequest("GET", "/foo", nil)
 	rec := httptest.NewRecorder()
@@ -81,7 +89,7 @@ func TestManifest(t *testing.T) {
 		ext := testutil.Extensions[0]
 		expected := addExtension(t, ext, extdir, "some-version")
 
-		s := &storage.Local{ExtDir: extdir}
+		s := newStorage(t, extdir)
 		manifest, err := s.Manifest(context.Background(), ext.Publisher, ext.Name, "some-version")
 		require.NoError(t, err)
 		require.Equal(t, expected, manifest)
@@ -99,8 +107,7 @@ func TestManifest(t *testing.T) {
 		err = os.WriteFile(file, []byte("invalid"), 0o644)
 		require.NoError(t, err)
 
-		s := &storage.Local{ExtDir: extdir}
-
+		s := newStorage(t, extdir)
 		_, err = s.Manifest(context.Background(), "foo", "bar", "baz")
 		require.Error(t, err)
 	})
@@ -108,10 +115,7 @@ func TestManifest(t *testing.T) {
 	t.Run("Missing", func(t *testing.T) {
 		t.Parallel()
 
-		extdir := t.TempDir()
-		s := &storage.Local{
-			ExtDir: extdir,
-		}
+		s := newStorage(t, t.TempDir())
 		_, err := s.Manifest(context.Background(), "foo", "bar", "baz")
 		require.Error(t, err)
 	})
@@ -151,7 +155,7 @@ func TestWalkExtensions(t *testing.T) {
 	t.Run("NoExtensions", func(t *testing.T) {
 		t.Parallel()
 
-		s := &storage.Local{ExtDir: t.TempDir()}
+		s := newStorage(t, t.TempDir())
 		called := false
 		err := s.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
 			called = true
@@ -164,7 +168,7 @@ func TestWalkExtensions(t *testing.T) {
 	t.Run("PropagateError", func(t *testing.T) {
 		t.Parallel()
 
-		s := &storage.Local{ExtDir: extdir}
+		s := newStorage(t, extdir)
 		ran := 0
 		expected := errors.New("error")
 		err := s.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
@@ -179,7 +183,7 @@ func TestWalkExtensions(t *testing.T) {
 		t.Parallel()
 
 		got := []extension{}
-		s := &storage.Local{ExtDir: extdir}
+		s := newStorage(t, extdir)
 		err := s.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
 			got = append(got, extension{
 				manifest: manifest,
@@ -353,8 +357,7 @@ func TestAddExtension(t *testing.T) {
 					extdir, err = test.setup(extdir)
 					require.NoError(t, err)
 				}
-				s := &storage.Local{ExtDir: extdir}
-
+				s := newStorage(t, extdir)
 				got, err := s.AddExtension(context.Background(), server.URL)
 				if test.error != "" {
 					require.Error(t, err)
@@ -425,8 +428,7 @@ func TestAddExtension(t *testing.T) {
 				}
 
 				extdir := t.TempDir()
-				s := &storage.Local{ExtDir: extdir}
-
+				s := newStorage(t, extdir)
 				source, err := test.source(extdir)
 				require.NoError(t, err)
 
@@ -522,8 +524,7 @@ func TestAddExtension(t *testing.T) {
 				err = os.WriteFile(vsixPath, vsix, 0o644)
 				require.NoError(t, err)
 
-				s := &storage.Local{ExtDir: extdir}
-
+				s := newStorage(t, extdir)
 				got, err := s.AddExtension(context.Background(), vsixPath)
 				require.Error(t, err)
 				require.Regexp(t, test.error, err.Error())
@@ -633,8 +634,7 @@ func TestRemoveExtension(t *testing.T) {
 			addExtension(t, ext, extdir, "b")
 			addExtension(t, ext, extdir, "c")
 
-			s := &storage.Local{ExtDir: extdir}
-
+			s := newStorage(t, extdir)
 			removed, err := s.RemoveExtension(context.Background(), test.remove, test.all)
 			if test.error != "" {
 				require.Error(t, err)

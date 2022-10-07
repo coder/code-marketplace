@@ -47,11 +47,7 @@ func add() *cobra.Command {
 			}
 
 			// Always local storage for now.
-			store := &storage.Local{
-				ExtDir: extdir,
-				Logger: logger,
-			}
-
+			store := storage.NewLocalStorage(ctx, extdir, logger)
 			ext, err := store.AddExtension(ctx, args[0])
 			if err != nil {
 				return err

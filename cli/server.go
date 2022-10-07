@@ -69,10 +69,7 @@ func server() *cobra.Command {
 			}
 
 			// Always local storage for now.
-			store := &storage.Local{
-				ExtDir: extdir,
-				Logger: logger,
-			}
+			store := storage.NewLocalStorage(ctx, extdir, logger)
 
 			// Always no database for now.
 			database := &database.NoDB{

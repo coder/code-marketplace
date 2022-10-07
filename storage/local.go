@@ -27,6 +27,13 @@ type Local struct {
 	Logger slog.Logger
 }
 
+func NewLocalStorage(_ context.Context, extdir string, logger slog.Logger) *Local {
+	return &Local{
+		ExtDir: extdir,
+		Logger: logger,
+	}
+}
+
 func (s *Local) AddExtension(ctx context.Context, source string) (*Extension, error) {
 	vsixBytes, err := readVSIX(ctx, source)
 	if err != nil {

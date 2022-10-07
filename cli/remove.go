@@ -47,11 +47,7 @@ func remove() *cobra.Command {
 			}
 
 			// Always local storage for now.
-			store := &storage.Local{
-				ExtDir: extdir,
-				Logger: logger,
-			}
-
+			store := storage.NewLocalStorage(ctx, extdir, logger)
 			removed, err := store.RemoveExtension(ctx, args[0], all)
 			if err != nil {
 				return err
