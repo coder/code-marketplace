@@ -26,7 +26,7 @@ import (
 
 type fakeStorage struct{}
 
-func (s *fakeStorage) AddExtension(ctx context.Context, source string) (*storage.Extension, error) {
+func (s *fakeStorage) AddExtension(ctx context.Context, vsix []byte) (*storage.Extension, error) {
 	return nil, errors.New("not implemented")
 }
 

@@ -98,10 +98,10 @@ type Extension struct {
 
 // TODO: Add Artifactory implementation of Storage.
 type Storage interface {
-	// AddExtension adds the extension found at the specified source by copying it
-	// into the extension storage directory and returns details about the added
-	// extension.  The source may be an URI or a local file path.
-	AddExtension(ctx context.Context, source string) (*Extension, error)
+	// AddExtension adds the provided VSIX by copying it into the extension
+	// storage directory and returns details about the added extension.  The
+	// source may be an URI or a local file path.
+	AddExtension(ctx context.Context, vsix []byte) (*Extension, error)
 	// RemoveExtension removes the extension by id (publisher, name, and version)
 	// or all versions if all is true (in which case the id should omit the
 	// version) and returns the IDs removed.
@@ -160,9 +160,9 @@ func validateManifest(manifest *VSIXManifest) error {
 	return nil
 }
 
-// readVSIX reads the bytes of a VSIX from the specified source.  The source
+// ReadVSIX reads the bytes of a VSIX from the specified source.  The source
 // might be a URI or a local file path.
-func readVSIX(ctx context.Context, source string) ([]byte, error) {
+func ReadVSIX(ctx context.Context, source string) ([]byte, error) {
 	if !strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://") {
 		// Assume it is a local file path.
 		return os.ReadFile(source)

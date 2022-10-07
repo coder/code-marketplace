@@ -46,9 +46,15 @@ func add() *cobra.Command {
 				return err
 			}
 
+			// Read in the extension.  In the future we might support stdin as well.
+			vsix, err := storage.ReadVSIX(ctx, args[0])
+			if err != nil {
+				return err
+			}
+
 			// Always local storage for now.
 			store := storage.NewLocalStorage(ctx, extdir, logger)
-			ext, err := store.AddExtension(ctx, args[0])
+			ext, err := store.AddExtension(ctx, vsix)
 			if err != nil {
 				return err
 			}

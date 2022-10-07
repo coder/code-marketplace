@@ -20,7 +20,7 @@ import (
 
 type memoryStorage struct{}
 
-func (s *memoryStorage) AddExtension(ctx context.Context, source string) (*storage.Extension, error) {
+func (s *memoryStorage) AddExtension(ctx context.Context, vsix []byte) (*storage.Extension, error) {
 	return nil, errors.New("not implemented")
 }
 
