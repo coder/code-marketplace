@@ -635,6 +635,11 @@ func TestRemoveExtension(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.ElementsMatch(t, test.expected, removed)
+			dir := filepath.Join(extdir, testutil.Extensions[0].Publisher, testutil.Extensions[0].Name)
+			for _, version := range test.expected {
+				_, err := os.Stat(filepath.Join(dir, version))
+				require.Error(t, err)
+			}
 		})
 	}
 }
