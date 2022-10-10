@@ -26,12 +26,12 @@ import (
 
 type fakeStorage struct{}
 
-func (s *fakeStorage) AddExtension(ctx context.Context, vsix []byte) (*storage.Extension, error) {
-	return nil, errors.New("not implemented")
+func (s *fakeStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte) (string, error) {
+	return "", errors.New("not implemented")
 }
 
-func (s *fakeStorage) RemoveExtension(ctx context.Context, id string, all bool) ([]string, error) {
-	return nil, errors.New("not implemented")
+func (s *fakeStorage) RemoveExtension(ctx context.Context, publisher, extension, version string) error {
+	return errors.New("not implemented")
 }
 
 func (s *fakeStorage) FileServer() http.Handler {
@@ -45,6 +45,10 @@ func (s *fakeStorage) FileServer() http.Handler {
 }
 
 func (s *fakeStorage) Manifest(ctx context.Context, publisher, extension, version string) (*storage.VSIXManifest, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *fakeStorage) Versions(ctx context.Context, publisher, name string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 

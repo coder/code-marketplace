@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"golang.org/x/xerrors"
@@ -89,37 +90,46 @@ type VSIXAsset struct {
 	Addressable string    `xml:",attr"`
 }
 
-type Extension struct {
-	ID           string
-	Location     string
-	Dependencies []string
-	Pack         []string
-}
-
 // TODO: Add Artifactory implementation of Storage.
 type Storage interface {
-	// AddExtension adds the provided VSIX by copying it into the extension
-	// storage directory and returns details about the added extension.  The
-	// source may be an URI or a local file path.
-	AddExtension(ctx context.Context, vsix []byte) (*Extension, error)
-	// RemoveExtension removes the extension by id (publisher, name, and version)
-	// or all versions if all is true (in which case the id should omit the
-	// version) and returns the IDs removed.
-	RemoveExtension(ctx context.Context, name string, all bool) ([]string, error)
+	// AddExtension adds the provided VSIX into storage and returns the location
+	// for verification purposes.
+	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error)
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
 	FileServer() http.Handler
-	// Manifest returns the manifest for the provided extension version.  The
-	// extension asset (the VSIX) will always be added even if it does not exist
-	// in the manifest on disk.
-	Manifest(ctx context.Context, publisher, extension, version string) (*VSIXManifest, error)
-	// WalkExtensions applies a function over every extension providing the
-	// manifest for the latest version and a list of all available versions.  If
-	// the function returns error the error is returned and the iteration aborted.
+	// Manifest returns the manifest bytes for the provided extension.  The
+	// extension asset itself (the VSIX) will be included on the manifest even if
+	// it does not exist on the manifest on disk.
+	Manifest(ctx context.Context, publisher, name, version string) (*VSIXManifest, error)
+	// RemoveExtension removes the provided version of the extension.  It errors
+	// if the provided version does not exist or if removing it fails.  If version
+	// is blank all versions of that extension will be removed.
+	RemoveExtension(ctx context.Context, publisher, name, version string) error
+	// Versions returns the available versions of the provided extension in sorted
+	// order.  If the extension does not exits it returns an error.
+	Versions(ctx context.Context, publisher, name string) ([]string, error)
+	// WalkExtensions applies a function over every extension.  The extension
+	// points to the latest version and the versions slice includes all the
+	// versions in sorted order including the latest version (which will be in
+	// [0]).  If the function returns an error the error is immediately returned
+	// which aborts the walk.
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error
 }
 
-// Parse an extension manifest.
+// Read and parse an extension manifest from a vsix file.  If the manifest is
+// invalid it will be returned along with the validation error.
+func ReadVSIXManifest(vsix []byte) (*VSIXManifest, error) {
+	vmr, err := GetZipFileReader(vsix, "extension.vsixmanifest")
+	if err != nil {
+		return nil, err
+	}
+	defer vmr.Close()
+	return parseVSIXManifest(vmr)
+}
+
+// Parse an extension manifest from a reader.  If the manifest is invalid it
+// will be returned along with the validation error.
 func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
 	var vm *VSIXManifest
 
@@ -130,14 +140,11 @@ func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
 		return nil, err
 	}
 
-	return vm, nil
+	return vm, validateManifest(vm)
 }
 
 // validateManifest checks a manifest for issues.
 func validateManifest(manifest *VSIXManifest) error {
-	if manifest == nil {
-		return xerrors.Errorf("vsix did not contain a manifest")
-	}
 	identity := manifest.Metadata.Identity
 	if identity.Publisher == "" {
 		return xerrors.Errorf("manifest did not contain a publisher")
@@ -174,10 +181,21 @@ func ReadVSIX(ctx context.Context, source string) ([]byte, error) {
 	})
 }
 
-// extensionID returns the full ID of an extension.
-func extensionID(manifest *VSIXManifest) string {
+// ExtensionID returns the full ID of an extension.
+func ExtensionID(manifest *VSIXManifest) string {
 	return fmt.Sprintf("%s.%s-%s",
 		manifest.Metadata.Identity.Publisher,
 		manifest.Metadata.Identity.ID,
 		manifest.Metadata.Identity.Version)
+}
+
+// ParseExtensionID parses an extension ID into its separate parts: publisher,
+// name, and version (version may be blank).
+func ParseExtensionID(id string) (string, string, string, error) {
+	re := regexp.MustCompile(`^([^.]+)\.([^-]+)-?(.*)$`)
+	match := re.FindAllStringSubmatch(id, -1)
+	if match == nil {
+		return "", "", "", xerrors.Errorf("\"%s\" does not match <publisher>.<name> or <publisher>.<name>-<version>", id)
+	}
+	return match[0][1], match[0][2], match[0][3], nil
 }

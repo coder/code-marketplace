@@ -20,18 +20,22 @@ import (
 
 type memoryStorage struct{}
 
-func (s *memoryStorage) AddExtension(ctx context.Context, vsix []byte) (*storage.Extension, error) {
-	return nil, errors.New("not implemented")
+func (s *memoryStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte) (string, error) {
+	return "", errors.New("not implemented")
 }
 
-func (s *memoryStorage) RemoveExtension(ctx context.Context, id string, all bool) ([]string, error) {
-	return nil, errors.New("not implemented")
+func (s *memoryStorage) RemoveExtension(ctx context.Context, publisher, extension, version string) error {
+	return errors.New("not implemented")
 }
 
 func (s *memoryStorage) FileServer() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "not implemented", http.StatusNotImplemented)
 	})
+}
+
+func (s *memoryStorage) Versions(ctx context.Context, publisher, name string) ([]string, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (s *memoryStorage) Manifest(ctx context.Context, publisher, extension, version string) (*storage.VSIXManifest, error) {

@@ -52,33 +52,55 @@ func add() *cobra.Command {
 				return err
 			}
 
-			// Always local storage for now.
-			store := storage.NewLocalStorage(ctx, extdir, logger)
-			ext, err := store.AddExtension(ctx, vsix)
+			// The manifest is required to know where to place the extension since it
+			// is unsafe to rely on the file name or URI.
+			manifest, err := storage.ReadVSIXManifest(vsix)
 			if err != nil {
 				return err
 			}
 
-			depCount := len(ext.Dependencies)
+			// Always local storage for now.
+			store := storage.NewLocalStorage(extdir, logger)
+			location, err := store.AddExtension(ctx, manifest, vsix)
+			if err != nil {
+				return err
+			}
+
+			deps := []string{}
+			pack := []string{}
+			for _, prop := range manifest.Metadata.Properties.Property {
+				if prop.Value == "" {
+					continue
+				}
+				switch prop.ID {
+				case storage.DependencyPropertyType:
+					deps = append(deps, strings.Split(prop.Value, ",")...)
+				case storage.PackPropertyType:
+					pack = append(pack, strings.Split(prop.Value, ",")...)
+				}
+			}
+
+			depCount := len(deps)
+			id := storage.ExtensionID(manifest)
 			summary := []string{
-				fmt.Sprintf("Unpacked %s to %s", ext.ID, ext.Location),
-				fmt.Sprintf("%s has %s", ext.ID, util.Plural(depCount, "dependency", "dependencies")),
+				fmt.Sprintf("Unpacked %s to %s", id, location),
+				fmt.Sprintf("%s has %s", id, util.Plural(depCount, "dependency", "dependencies")),
 			}
 
 			if depCount > 0 {
-				for _, id := range ext.Dependencies {
+				for _, id := range deps {
 					summary = append(summary, fmt.Sprintf("  - %s", id))
 				}
 			}
 
-			packCount := len(ext.Pack)
+			packCount := len(pack)
 			if packCount > 0 {
-				summary = append(summary, fmt.Sprintf("%s is in a pack with %s", ext.ID, util.Plural(packCount, "other extension", "")))
-				for _, id := range ext.Pack {
+				summary = append(summary, fmt.Sprintf("%s is in a pack with %s", id, util.Plural(packCount, "other extension", "")))
+				for _, id := range pack {
 					summary = append(summary, fmt.Sprintf("  - %s", id))
 				}
 			} else {
-				summary = append(summary, fmt.Sprintf("%s is not in a pack", ext.ID))
+				summary = append(summary, fmt.Sprintf("%s is not in a pack", id))
 			}
 
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(summary, "\n"))
