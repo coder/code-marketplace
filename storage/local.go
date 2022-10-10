@@ -66,8 +66,8 @@ func (s *Local) AddExtension(ctx context.Context, vsix []byte) (*Extension, erro
 	}
 
 	// Copy the VSIX itself as well.
-	name := fmt.Sprintf("%s.%s-%s", identity.Publisher, identity.ID, identity.Version)
-	vsixName := fmt.Sprintf("%s.vsix", name)
+	id := extensionID(manifest)
+	vsixName := fmt.Sprintf("%s.vsix", id)
 	dst, err := os.OpenFile(filepath.Join(dir, vsixName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (s *Local) AddExtension(ctx context.Context, vsix []byte) (*Extension, erro
 		return nil, err
 	}
 
-	ext := &Extension{ID: name, Location: dir}
+	ext := &Extension{ID: id, Location: dir}
 	for _, prop := range manifest.Metadata.Properties.Property {
 		if prop.Value == "" {
 			continue
@@ -163,7 +163,21 @@ func (s *Local) Manifest(ctx context.Context, publisher, extension, version stri
 	}
 	defer reader.Close()
 
-	return parseVSIXManifest(reader)
+	manifest, err := parseVSIXManifest(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// The extension asset is not stored in the manifest.  Since we always store
+	// it next to the manifest using the publisher.name-version format we can set
+	// that as the path.
+	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
+		Type:        VSIXAssetType,
+		Path:        fmt.Sprintf("%s.vsix", extensionID(manifest)),
+		Addressable: "true",
+	})
+
+	return manifest, nil
 }
 
 func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error {

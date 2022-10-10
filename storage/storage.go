@@ -109,7 +109,9 @@ type Storage interface {
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
 	FileServer() http.Handler
-	// Manifest returns the manifest for the provided extension version.
+	// Manifest returns the manifest for the provided extension version.  The
+	// extension asset (the VSIX) will always be added even if it does not exist
+	// in the manifest on disk.
 	Manifest(ctx context.Context, publisher, extension, version string) (*VSIXManifest, error)
 	// WalkExtensions applies a function over every extension providing the
 	// manifest for the latest version and a list of all available versions.  If
@@ -127,18 +129,6 @@ func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// The extension asset is not stored in the manifest.  Since we always store
-	// it next to the manifest using the publisher.name-version format we can set
-	// that as the path.
-	vm.Assets.Asset = append(vm.Assets.Asset, VSIXAsset{
-		Type: VSIXAssetType,
-		Path: fmt.Sprintf("%s.%s-%s.vsix",
-			vm.Metadata.Identity.Publisher,
-			vm.Metadata.Identity.ID,
-			vm.Metadata.Identity.Version),
-		Addressable: "true",
-	})
 
 	return vm, nil
 }
@@ -182,4 +172,12 @@ func ReadVSIX(ctx context.Context, source string) ([]byte, error) {
 		R: resp.Body,
 		N: 100 * 1000 * 1000, // 100 MB
 	})
+}
+
+// extensionID returns the full ID of an extension.
+func extensionID(manifest *VSIXManifest) string {
+	return fmt.Sprintf("%s.%s-%s",
+		manifest.Metadata.Identity.Publisher,
+		manifest.Metadata.Identity.ID,
+		manifest.Metadata.Identity.Version)
 }
