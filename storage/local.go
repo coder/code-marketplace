@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -47,16 +46,8 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	}
 
 	// Copy the VSIX itself as well.
-	id := ExtensionID(manifest)
-	dst, err := os.OpenFile(
-		filepath.Join(dir, fmt.Sprintf("%s.vsix", id)),
-		os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
-		0o644)
-	if err != nil {
-		return "", err
-	}
-	defer dst.Close()
-	_, err = io.Copy(dst, bytes.NewReader(vsix))
+	vsixPath := filepath.Join(dir, fmt.Sprintf("%s.vsix", ExtensionID(manifest)))
+	err = os.WriteFile(vsixPath, vsix, 0o644)
 	if err != nil {
 		return "", err
 	}
