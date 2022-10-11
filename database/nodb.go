@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strings"
 
@@ -31,13 +32,12 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 	fileBase := (&url.URL{
 		Scheme: baseURL.Scheme,
 		Host:   baseURL.Host,
-		Path: strings.Join([]string{
+		Path: path.Join(
 			baseURL.Path,
 			"files",
 			asset.Publisher,
 			asset.Extension,
-			asset.Version,
-		}, "/"),
+			asset.Version),
 	}).String()
 
 	for _, a := range manifest.Assets.Asset {
@@ -310,13 +310,12 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 			fileBase := (&url.URL{
 				Scheme: baseURL.Scheme,
 				Host:   baseURL.Host,
-				Path: strings.Join([]string{
+				Path: path.Join(
 					baseURL.Path,
-					"files",
+					"/files",
 					ext.Publisher.PublisherName,
 					ext.Name,
-					versionStr,
-				}, "/"),
+					versionStr),
 			}).String()
 			for _, asset := range manifest.Assets.Asset {
 				if asset.Addressable != "true" {
@@ -343,13 +342,12 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 			version.AssetURI = (&url.URL{
 				Scheme: baseURL.Scheme,
 				Host:   baseURL.Host,
-				Path: strings.Join([]string{
+				Path: path.Join(
 					baseURL.Path,
 					"assets",
 					ext.Publisher.PublisherName,
 					ext.Name,
-					versionStr,
-				}, "/"),
+					versionStr),
 			}).String()
 			version.FallbackAssetURI = version.AssetURI
 		}
