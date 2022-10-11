@@ -1,10 +1,7 @@
 package storage_test
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -172,45 +169,6 @@ func TestWalkExtensions(t *testing.T) {
 	})
 }
 
-type file struct {
-	name string
-	body []byte
-}
-
-// createVSIX returns the bytes for a VSIX file containing the provided raw
-// manifest bytes (if not nil) and an icon.
-func createVSIX(t *testing.T, manifestBytes []byte) []byte {
-	files := []file{{"icon.png", []byte("fake icon")}}
-	if manifestBytes != nil {
-		files = append(files, file{"extension.vsixmanifest", manifestBytes})
-	}
-	buf := bytes.NewBuffer(nil)
-	zw := zip.NewWriter(buf)
-	for _, file := range files {
-		fw, err := zw.Create(file.name)
-		require.NoError(t, err)
-		_, err = fw.Write([]byte(file.body))
-		require.NoError(t, err)
-	}
-	err := zw.Close()
-	require.NoError(t, err)
-	return buf.Bytes()
-}
-
-// createVSIXFromManifest returns the bytes for a VSIX file containing the
-// provided manifest and an icon.
-func createVSIXFromManifest(t *testing.T, manifest *storage.VSIXManifest) []byte {
-	manifestBytes, err := xml.Marshal(manifest)
-	require.NoError(t, err)
-	return createVSIX(t, manifestBytes)
-}
-
-// createVSIXFromExtension returns the bytes for a VSIX file containing the
-// manifest for the provided test extension and an icon.
-func createVSIXFromExtension(t *testing.T, ext testutil.Extension) []byte {
-	return createVSIXFromManifest(t, testutil.ConvertExtensionToManifest(ext, ext.LatestVersion))
-}
-
 func TestReadVSIX(t *testing.T) {
 	t.Parallel()
 
@@ -257,7 +215,7 @@ func TestReadVSIX(t *testing.T) {
 				handler := test.handler
 				if handler == nil {
 					handler = func(rw http.ResponseWriter, r *http.Request) {
-						vsix := createVSIXFromExtension(t, test.expected)
+						vsix := testutil.CreateVSIXFromExtension(t, test.expected)
 						_, err := rw.Write(vsix)
 						require.NoError(t, err)
 					}
@@ -271,7 +229,7 @@ func TestReadVSIX(t *testing.T) {
 					require.Error(t, err)
 					require.Regexp(t, test.error, err.Error())
 				} else {
-					require.Equal(t, createVSIXFromExtension(t, test.expected), got)
+					require.Equal(t, testutil.CreateVSIXFromExtension(t, test.expected), got)
 				}
 			})
 		}
@@ -299,7 +257,7 @@ func TestReadVSIX(t *testing.T) {
 				name:     "OK",
 				expected: testutil.Extensions[0],
 				source: func(t *testing.T, extdir string) (string, error) {
-					vsix := createVSIXFromExtension(t, testutil.Extensions[0])
+					vsix := testutil.CreateVSIXFromExtension(t, testutil.Extensions[0])
 					vsixPath := filepath.Join(extdir, "extension.vsix")
 					return vsixPath, os.WriteFile(vsixPath, vsix, 0o644)
 				},
@@ -341,7 +299,7 @@ func TestReadVSIX(t *testing.T) {
 					require.Error(t, err)
 					require.True(t, errors.Is(err, test.error))
 				} else {
-					require.Equal(t, createVSIXFromExtension(t, test.expected), got)
+					require.Equal(t, testutil.CreateVSIXFromExtension(t, test.expected), got)
 				}
 			})
 		}
@@ -379,27 +337,27 @@ func TestReadVSIXManifest(t *testing.T) {
 		{
 			name:  "MissingManifest",
 			error: "not found",
-			vsix:  createVSIX(t, nil),
+			vsix:  testutil.CreateVSIX(t, nil),
 		},
 		{
 			name:  "EmptyManifest",
 			error: "EOF",
-			vsix:  createVSIX(t, []byte("")),
+			vsix:  testutil.CreateVSIX(t, []byte("")),
 		},
 		{
 			name:  "TextFileManifest",
 			error: "EOF",
-			vsix:  createVSIX(t, []byte("just some random text")),
+			vsix:  testutil.CreateVSIX(t, []byte("just some random text")),
 		},
 		{
 			name:  "ManifestSyntaxError",
 			error: "XML syntax error",
-			vsix:  createVSIX(t, []byte("<PackageManifest/PackageManifest>")),
+			vsix:  testutil.CreateVSIX(t, []byte("<PackageManifest/PackageManifest>")),
 		},
 		{
 			name:  "ManifestMissingPublisher",
 			error: "publisher",
-			vsix:  createVSIXFromManifest(t, &storage.VSIXManifest{}),
+			vsix:  testutil.CreateVSIXFromManifest(t, &storage.VSIXManifest{}),
 		},
 		{
 			name:  "ManifestMissingID",
@@ -432,7 +390,7 @@ func TestReadVSIXManifest(t *testing.T) {
 			t.Parallel()
 			vsix := test.vsix
 			if vsix == nil {
-				vsix = createVSIXFromManifest(t, test.manifest)
+				vsix = testutil.CreateVSIXFromManifest(t, test.manifest)
 			}
 			manifest, err := storage.ReadVSIXManifest(vsix)
 			if test.error != "" {
@@ -529,7 +487,7 @@ func TestAddExtension(t *testing.T) {
 			vsix := test.vsix
 			if vsix == nil {
 				manifest = testutil.ConvertExtensionToManifest(test.extension, test.extension.LatestVersion)
-				vsix = createVSIXFromManifest(t, manifest)
+				vsix = testutil.CreateVSIXFromManifest(t, manifest)
 			}
 			location, err := s.AddExtension(context.Background(), manifest, vsix)
 			if test.error != "" {

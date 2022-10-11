@@ -1,6 +1,8 @@
 package testutil
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -143,4 +145,43 @@ func AddExtension(t *testing.T, ext Extension, extdir, version string) *storage.
 	})
 
 	return manifest
+}
+
+type file struct {
+	name string
+	body []byte
+}
+
+// createVSIX returns the bytes for a VSIX file containing the provided raw
+// manifest bytes (if not nil) and an icon.
+func CreateVSIX(t *testing.T, manifestBytes []byte) []byte {
+	files := []file{{"icon.png", []byte("fake icon")}}
+	if manifestBytes != nil {
+		files = append(files, file{"extension.vsixmanifest", manifestBytes})
+	}
+	buf := bytes.NewBuffer(nil)
+	zw := zip.NewWriter(buf)
+	for _, file := range files {
+		fw, err := zw.Create(file.name)
+		require.NoError(t, err)
+		_, err = fw.Write([]byte(file.body))
+		require.NoError(t, err)
+	}
+	err := zw.Close()
+	require.NoError(t, err)
+	return buf.Bytes()
+}
+
+// CreateVSIXFromManifest returns the bytes for a VSIX file containing the
+// provided manifest and an icon.
+func CreateVSIXFromManifest(t *testing.T, manifest *storage.VSIXManifest) []byte {
+	manifestBytes, err := xml.Marshal(manifest)
+	require.NoError(t, err)
+	return CreateVSIX(t, manifestBytes)
+}
+
+// CreateVSIXFromExtension returns the bytes for a VSIX file containing the
+// manifest for the provided test extension and an icon.
+func CreateVSIXFromExtension(t *testing.T, ext Extension) []byte {
+	return CreateVSIXFromManifest(t, ConvertExtensionToManifest(ext, ext.LatestVersion))
 }
