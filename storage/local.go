@@ -98,11 +98,9 @@ func (s *Local) RemoveExtension(ctx context.Context, publisher, name, version st
 func (s *Local) Versions(ctx context.Context, publisher, name string) ([]string, error) {
 	dir := filepath.Join(s.extdir, publisher, name)
 	versions, err := s.getDirNames(ctx, dir)
-	if err != nil {
-		return nil, err
-	}
+	// Return anything we did get even if there was an error.
 	sort.Sort(sort.Reverse(semver.ByVersion(versions)))
-	return versions, nil
+	return versions, err
 }
 
 func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error {
@@ -120,13 +118,10 @@ func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManife
 		}
 		for _, extension := range extensions {
 			ctx := slog.With(ctx, slog.F("extension", extension))
-			dir := filepath.Join(s.extdir, publisher, extension)
-
-			versions, err := s.getDirNames(ctx, dir)
+			versions, err := s.Versions(ctx, publisher, extension)
 			if err != nil {
 				s.logger.Error(ctx, "Error reading versions", slog.Error(err))
 			}
-			sort.Sort(sort.Reverse(semver.ByVersion(versions)))
 			if len(versions) == 0 {
 				continue
 			}
