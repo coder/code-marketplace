@@ -205,6 +205,26 @@ func TestReadVSIX(t *testing.T) {
 					rw.Header().Set("Content-Length", "1")
 				},
 			},
+			{
+				name:     "Redirect",
+				expected: testutil.Extensions[0],
+				handler: func(rw http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/redirected" {
+						vsix := testutil.CreateVSIXFromExtension(t, testutil.Extensions[0])
+						_, err := rw.Write(vsix)
+						require.NoError(t, err)
+					} else {
+						http.Redirect(rw, r, "/redirected", http.StatusFound)
+					}
+				},
+			},
+			{
+				name:  "InfiniteRedirects",
+				error: "stopped after 10 redirects",
+				handler: func(rw http.ResponseWriter, r *http.Request) {
+					http.Redirect(rw, r, ".", http.StatusFound)
+				},
+			},
 		}
 
 		for _, test := range tests {
