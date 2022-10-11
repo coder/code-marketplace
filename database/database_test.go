@@ -2,11 +2,8 @@ package database_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,52 +11,8 @@ import (
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/slogtest"
 	"github.com/coder/code-marketplace/database"
-	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/testutil"
 )
-
-type memoryStorage struct{}
-
-func (s *memoryStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte) (string, error) {
-	return "", errors.New("not implemented")
-}
-
-func (s *memoryStorage) RemoveExtension(ctx context.Context, publisher, extension, version string) error {
-	return errors.New("not implemented")
-}
-
-func (s *memoryStorage) FileServer() http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		http.Error(rw, "not implemented", http.StatusNotImplemented)
-	})
-}
-
-func (s *memoryStorage) Versions(ctx context.Context, publisher, name string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *memoryStorage) Manifest(ctx context.Context, publisher, extension, version string) (*storage.VSIXManifest, error) {
-	for _, ext := range testutil.Extensions {
-		if ext.Publisher == publisher && ext.Name == extension {
-			for _, ver := range ext.Versions {
-				if ver == version {
-					return testutil.ConvertExtensionToManifest(ext, ver), nil
-				}
-			}
-			break
-		}
-	}
-	return nil, os.ErrNotExist
-}
-
-func (s *memoryStorage) WalkExtensions(ctx context.Context, fn func(manifest *storage.VSIXManifest, versions []string) error) error {
-	for _, ext := range testutil.Extensions {
-		if err := fn(testutil.ConvertExtensionToManifest(ext, ext.Versions[0]), ext.Versions); err != nil {
-			return nil
-		}
-	}
-	return nil
-}
 
 func TestGetExtensionAssetPath(t *testing.T) {
 	t.Parallel()
@@ -70,7 +23,7 @@ func TestGetExtensionAssetPath(t *testing.T) {
 
 	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
 	db := database.NoDB{
-		Storage: &memoryStorage{},
+		Storage: testutil.NewMockStorage(),
 		Logger:  logger,
 	}
 
@@ -566,7 +519,7 @@ func TestGetExtensions(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			t.Parallel()
 			db := database.NoDB{
-				Storage: &memoryStorage{},
+				Storage: testutil.NewMockStorage(),
 				Logger:  slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug),
 			}
 			baseURL, err := url.Parse(base)

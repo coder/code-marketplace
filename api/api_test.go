@@ -2,16 +2,11 @@ package api_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,68 +16,8 @@ import (
 	"github.com/coder/code-marketplace/api"
 	"github.com/coder/code-marketplace/api/httpapi"
 	"github.com/coder/code-marketplace/database"
-	"github.com/coder/code-marketplace/storage"
+	"github.com/coder/code-marketplace/testutil"
 )
-
-type fakeStorage struct{}
-
-func (s *fakeStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte) (string, error) {
-	return "", errors.New("not implemented")
-}
-
-func (s *fakeStorage) RemoveExtension(ctx context.Context, publisher, extension, version string) error {
-	return errors.New("not implemented")
-}
-
-func (s *fakeStorage) FileServer() http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/nonexistent" {
-			http.Error(rw, "not found", http.StatusNotFound)
-		} else {
-			_, _ = rw.Write([]byte("foobar"))
-		}
-	})
-}
-
-func (s *fakeStorage) Manifest(ctx context.Context, publisher, extension, version string) (*storage.VSIXManifest, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *fakeStorage) Versions(ctx context.Context, publisher, name string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *fakeStorage) WalkExtensions(ctx context.Context, fn func(manifest *storage.VSIXManifest, versions []string) error) error {
-	return errors.New("not implemented")
-}
-
-type fakeDB struct {
-	exts []*database.Extension
-}
-
-func (db *fakeDB) GetExtensionAssetPath(ctx context.Context, asset *database.Asset, baseURL url.URL) (string, error) {
-	if asset.Publisher == "error" {
-		return "", errors.New("fake error")
-	}
-	if asset.Publisher == "notexist" {
-		return "", os.ErrNotExist
-	}
-	assetPath := "foo"
-	if asset.Type == storage.VSIXAssetType {
-		assetPath = "extension.vsix"
-	}
-	return strings.Join([]string{baseURL.Path, "files", asset.Publisher, asset.Extension, asset.Version, assetPath}, "/"), nil
-}
-
-func (db *fakeDB) GetExtensions(ctx context.Context, filter database.Filter, flags database.Flag, baseURL url.URL) ([]*database.Extension, int, error) {
-	if flags&database.Unpublished != 0 {
-		return nil, 0, errors.New("fake error")
-	}
-	if len(filter.Criteria) == 0 {
-		return nil, 0, nil
-	}
-	return db.exts, len(db.exts), nil
-}
 
 func TestAPI(t *testing.T) {
 	t.Parallel()
@@ -291,8 +226,8 @@ func TestAPI(t *testing.T) {
 
 			logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
 			apiServer := api.New(&api.Options{
-				Database: &fakeDB{exts: exts},
-				Storage:  &fakeStorage{},
+				Database: testutil.NewMockDB(exts),
+				Storage:  testutil.NewMockStorage(),
 				Logger:   logger,
 			})
 
