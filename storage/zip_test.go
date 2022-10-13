@@ -16,6 +16,7 @@ var files = []struct {
 	{"alpha.txt", "Alpha content."},
 	{"beta.txt", "Beta content."},
 	{"charlie.txt", "Charlie content."},
+	{"delta/delta.txt", "Delta content."},
 }
 
 func createZip() ([]byte, error) {
@@ -55,12 +56,6 @@ func TestGetZipFileReader(t *testing.T) {
 	require.Error(t, err)
 }
 
-type nopCloser struct {
-	io.Writer
-}
-
-func (nopCloser) Close() error { return nil }
-
 func TestExtract(t *testing.T) {
 	t.Parallel()
 
@@ -68,19 +63,19 @@ func TestExtract(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Error", func(t *testing.T) {
-		err := ExtractZip(buffer, func(name string) (io.WriteCloser, error) {
-			return nil, errors.New("error")
+		err := ExtractZip(buffer, func(name string, reader io.Reader) error {
+			return errors.New("error")
 		})
 		require.Error(t, err)
 	})
 
 	t.Run("OK", func(t *testing.T) {
 		called := []string{}
-		err := ExtractZip(buffer, func(name string) (io.WriteCloser, error) {
+		err := ExtractZip(buffer, func(name string, reader io.Reader) error {
 			called = append(called, name)
-			return nopCloser{io.Discard}, nil
+			return nil
 		})
 		require.NoError(t, err)
-		require.Equal(t, []string{"alpha.txt", "beta.txt", "charlie.txt"}, called)
+		require.Equal(t, []string{"alpha.txt", "beta.txt", "charlie.txt", "delta/delta.txt"}, called)
 	})
 }

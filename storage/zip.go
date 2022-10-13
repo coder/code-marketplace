@@ -48,26 +48,17 @@ func GetZipFileReader(rawZip []byte, filename string) (io.ReadCloser, error) {
 	return reader, nil
 }
 
-// ExtractZip extracts a zip's files to the specified directory.  The writer is
-// expected to create any necessary directories and return a writer for writing
-// a file.
-func ExtractZip(rawZip []byte, writer func(name string) (io.WriteCloser, error)) error {
+// ExtractZip applies a function with a reader for every file in the zip.  If
+// the function returns an error the walk is aborted.
+func ExtractZip(rawZip []byte, fn func(name string, reader io.Reader) error) error {
 	_, err := WalkZip(rawZip, func(zf *zip.File) (stop bool, err error) {
 		if !zf.FileInfo().IsDir() {
-			dst, err := writer(zf.Name)
+			zr, err := zf.Open()
 			if err != nil {
 				return false, err
 			}
-			defer dst.Close()
-			src, err := zf.Open()
-			if err != nil {
-				return false, err
-			}
-			defer src.Close()
-			_, err = io.Copy(dst, src)
-			if err != nil {
-				return false, err
-			}
+			defer zr.Close()
+			return false, fn(zf.Name, zr)
 		}
 		return false, nil
 	})

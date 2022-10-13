@@ -33,13 +33,19 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
 	dir := filepath.Join(s.extdir, identity.Publisher, identity.ID, identity.Version)
-	err := ExtractZip(vsix, func(name string) (io.WriteCloser, error) {
+	err := ExtractZip(vsix, func(name string, r io.Reader) error {
 		path := filepath.Join(dir, name)
 		err := os.MkdirAll(filepath.Dir(path), 0o755)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+		w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+		if err != nil {
+			return err
+		}
+		defer w.Close()
+		_, err = io.Copy(w, r)
+		return err
 	})
 	if err != nil {
 		return "", err
