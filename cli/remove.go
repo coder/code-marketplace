@@ -69,7 +69,7 @@ func remove() *cobra.Command {
 			}
 
 			versionCount := len(allVersions)
-			if !all && version != "" && !contains(allVersions, version) {
+			if !all && version != "" && !util.Contains(allVersions, version) {
 				return xerrors.Errorf("%s does not exist", id)
 			} else if versionCount == 0 {
 				return xerrors.Errorf("%s.%s has no versions to delete", publisher, name)
@@ -107,13 +107,4 @@ func remove() *cobra.Command {
 	_ = cmd.MarkFlagRequired("extensions-dir")
 
 	return cmd
-}
-
-func contains(a []string, b string) bool {
-	for _, astr := range a {
-		if astr == b {
-			return true
-		}
-	}
-	return false
 }

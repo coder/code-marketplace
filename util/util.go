@@ -13,3 +13,12 @@ func Plural(count int, singular, plural string) string {
 	}
 	return strconv.Itoa(count) + " " + plural
 }
+
+func Contains(a []string, b string) bool {
+	for _, astr := range a {
+		if astr == b {
+			return true
+		}
+	}
+	return false
+}

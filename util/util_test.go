@@ -19,3 +19,12 @@ func TestPlural(t *testing.T) {
 	require.Equal(t, "1 dependency", util.Plural(1, "dependency", "dependencies"))
 	require.Equal(t, "2 dependencies", util.Plural(2, "dependency", "dependencies"))
 }
+
+func TestContains(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, util.Contains([]string{"foo", "bar"}, "foo"))
+	require.True(t, util.Contains([]string{"foo", "bar"}, "bar"))
+	require.False(t, util.Contains([]string{"foo", "bar"}, "baz"))
+	require.False(t, util.Contains([]string{"foo", "bar"}, "foobar"))
+}
