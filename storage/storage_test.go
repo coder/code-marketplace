@@ -25,7 +25,70 @@ import (
 
 func newStorage(t *testing.T, dir string) storage.Storage {
 	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
-	return storage.NewLocalStorage(dir, logger)
+	s, err := storage.NewLocalStorage(dir, logger)
+	require.NoError(t, err)
+	return s
+}
+
+func TestNewStorage(t *testing.T) {
+	t.Run("Local", func(t *testing.T) {
+		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
+		s, err := storage.NewStorage(&storage.Options{
+			ExtDir: "/extensions",
+		})
+		require.NoError(t, err)
+		_, ok := s.(*storage.Local)
+		require.True(t, ok)
+	})
+
+	t.Run("ArtifactoryKey", func(t *testing.T) {
+		t.Setenv(storage.ArtifactoryTokenEnvKey, "foo")
+		s, err := storage.NewStorage(&storage.Options{
+			Artifactory: "coder.com",
+			Repo:        "extensions",
+		})
+		require.NoError(t, err)
+		_, ok := s.(*storage.Artifactory)
+		require.True(t, ok)
+	})
+
+	t.Run("ArtifactoryNoKey", func(t *testing.T) {
+		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
+		_, err := storage.NewStorage(&storage.Options{
+			Artifactory: "coder.com",
+			Repo:        "extensions",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("NoRepo", func(t *testing.T) {
+		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
+		_, err := storage.NewStorage(&storage.Options{
+			Artifactory: "coder.com",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("Both", func(t *testing.T) {
+		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
+		_, err := storage.NewStorage(&storage.Options{
+			Artifactory: "coder.com",
+			ExtDir:      "/extensions",
+		})
+		require.Error(t, err)
+
+		_, err = storage.NewStorage(&storage.Options{
+			ExtDir: "/extensions",
+			Repo:   "extensions",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("None", func(t *testing.T) {
+		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
+		_, err := storage.NewStorage(&storage.Options{})
+		require.Error(t, err)
+	})
 }
 
 func TestFileServer(t *testing.T) {

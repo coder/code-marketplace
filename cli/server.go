@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,8 +23,10 @@ import (
 
 func server() *cobra.Command {
 	var (
-		extdir  string
-		address string
+		address     string
+		artifactory string
+		extdir      string
+		repo        string
 	)
 
 	cmd := &cobra.Command{
@@ -33,6 +34,7 @@ func server() *cobra.Command {
 		Short: "Start the Code extension marketplace",
 		Example: strings.Join([]string{
 			"  marketplace server --extensions-dir ./extensions",
+			"  marketplace server --artifactory http://artifactory.server/artifactory --repo extensions",
 		}, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithCancel(cmd.Context())
@@ -50,6 +52,16 @@ func server() *cobra.Command {
 				logger = logger.Leveled(slog.LevelDebug)
 			}
 
+			store, err := storage.NewStorage(&storage.Options{
+				Artifactory: artifactory,
+				ExtDir:      extdir,
+				Logger:      logger,
+				Repo:        repo,
+			})
+			if err != nil {
+				return err
+			}
+
 			// A separate listener is required to get the resulting address (as
 			// opposed to using http.ListenAndServe()).
 			listener, err := net.Listen("tcp", address)
@@ -62,14 +74,6 @@ func server() *cobra.Command {
 				return xerrors.New("must be listening on tcp")
 			}
 			logger.Info(ctx, "Starting API server", slog.F("address", tcpAddr))
-
-			extdir, err = filepath.Abs(extdir)
-			if err != nil {
-				return err
-			}
-
-			// Always local storage for now.
-			store := storage.NewLocalStorage(extdir, logger)
 
 			// Always no database for now.
 			database := &database.NoDB{
@@ -130,7 +134,8 @@ func server() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
-	_ = cmd.MarkFlagRequired("extensions-dir")
+	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
+	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 	cmd.Flags().StringVar(&address, "address", "127.0.0.1:3001", "The address on which to serve the marketplace API.")
 
 	return cmd

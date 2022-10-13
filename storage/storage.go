@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"golang.org/x/xerrors"
+
+	"cdr.dev/slog"
 )
 
 // VSIXManifest implement XMLManifest.PackageManifest.
@@ -92,7 +94,13 @@ type VSIXAsset struct {
 	Addressable string    `xml:",attr"`
 }
 
-// TODO: Add Artifactory implementation of Storage.
+type Options struct {
+	Artifactory string
+	ExtDir      string
+	Repo        string
+	Logger      slog.Logger
+}
+
 type Storage interface {
 	// AddExtension adds the provided VSIX into storage and returns the location
 	// for verification purposes.
@@ -117,6 +125,22 @@ type Storage interface {
 	// [0]).  If the function returns an error the error is immediately returned
 	// which aborts the walk.
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error
+}
+
+// NewStorage returns a storage instance based on the provided extension
+// directory or Artifactory URL.  If neither or both are provided an error is
+// returned.
+func NewStorage(options *Options) (Storage, error) {
+	if (options.Repo != "" || options.Artifactory != "") && options.ExtDir != "" {
+		return nil, xerrors.Errorf("cannot use both Artifactory and extension directory")
+	} else if options.Artifactory != "" && options.Repo == "" {
+		return nil, xerrors.Errorf("must provide repository")
+	} else if options.Artifactory != "" {
+		return NewArtifactoryStorage(options.Artifactory, options.Repo, options.Logger)
+	} else if options.ExtDir != "" {
+		return NewLocalStorage(options.ExtDir, options.Logger)
+	}
+	return nil, xerrors.Errorf("must provide an Artifactory repository or local directory")
 }
 
 // ReadVSIXManifest reads and parses an extension manifest from a vsix file.  If

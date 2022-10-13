@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,7 +16,9 @@ import (
 
 func add() *cobra.Command {
 	var (
-		extdir string
+		artifactory string
+		extdir      string
+		repo        string
 	)
 
 	cmd := &cobra.Command{
@@ -25,7 +26,7 @@ func add() *cobra.Command {
 		Short: "Add an extension to the marketplace",
 		Example: strings.Join([]string{
 			"  marketplace add https://domain.tld/extension.vsix --extensions-dir ./extensions",
-			"  marketplace add extension.vsix --extensions-dir ./extensions",
+			"  marketplace add extension.vsix --artifactory http://artifactory.server/artifactory --repo extensions",
 		}, "\n"),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +42,12 @@ func add() *cobra.Command {
 				logger = logger.Leveled(slog.LevelDebug)
 			}
 
-			extdir, err = filepath.Abs(extdir)
+			store, err := storage.NewStorage(&storage.Options{
+				Artifactory: artifactory,
+				ExtDir:      extdir,
+				Logger:      logger,
+				Repo:        repo,
+			})
 			if err != nil {
 				return err
 			}
@@ -59,8 +65,6 @@ func add() *cobra.Command {
 				return err
 			}
 
-			// Always local storage for now.
-			store := storage.NewLocalStorage(extdir, logger)
 			location, err := store.AddExtension(ctx, manifest, vsix)
 			if err != nil {
 				return err
@@ -109,7 +113,8 @@ func add() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
-	_ = cmd.MarkFlagRequired("extensions-dir")
+	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
+	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 
 	return cmd
 }

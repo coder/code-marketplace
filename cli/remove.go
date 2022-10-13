@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,8 +19,10 @@ import (
 
 func remove() *cobra.Command {
 	var (
-		extdir string
-		all    bool
+		all         bool
+		artifactory string
+		extdir      string
+		repo        string
 	)
 
 	cmd := &cobra.Command{
@@ -29,7 +30,7 @@ func remove() *cobra.Command {
 		Short: "Remove an extension from the marketplace",
 		Example: strings.Join([]string{
 			"  marketplace remove publisher.extension-1.0.0 --extensions-dir ./extensions",
-			"  marketplace remove publisher.extension --all --extensions-dir ./extensions",
+			"  marketplace remove publisher.extension --all --artifactory http://artifactory.server/artifactory --repo extensions",
 		}, "\n"),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,7 +46,12 @@ func remove() *cobra.Command {
 				logger = logger.Leveled(slog.LevelDebug)
 			}
 
-			extdir, err = filepath.Abs(extdir)
+			store, err := storage.NewStorage(&storage.Options{
+				Artifactory: artifactory,
+				ExtDir:      extdir,
+				Logger:      logger,
+				Repo:        repo,
+			})
 			if err != nil {
 				return err
 			}
@@ -59,9 +65,6 @@ func remove() *cobra.Command {
 			if version != "" && all {
 				return xerrors.Errorf("cannot specify both --all and version %s", version)
 			}
-
-			// Always local storage for now.
-			store := storage.NewLocalStorage(extdir, logger)
 
 			allVersions, err := store.Versions(ctx, publisher, name)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -104,7 +107,8 @@ func remove() *cobra.Command {
 
 	cmd.Flags().BoolVar(&all, "all", false, "Whether to delete all versions of the extension.")
 	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
-	_ = cmd.MarkFlagRequired("extensions-dir")
+	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
+	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 
 	return cmd
 }

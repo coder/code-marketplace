@@ -22,11 +22,15 @@ type Local struct {
 	logger slog.Logger
 }
 
-func NewLocalStorage(extdir string, logger slog.Logger) *Local {
+func NewLocalStorage(extdir string, logger slog.Logger) (*Local, error) {
+	extdir, err := filepath.Abs(extdir)
+	if err != nil {
+		return nil, err
+	}
 	return &Local{
 		extdir: extdir,
 		logger: logger,
-	}
+	}, nil
 }
 
 func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {

@@ -29,15 +29,34 @@ wget https://github.com/coder/code-marketplace/releases/latest/download/code-mar
 chmod +x ./code-marketplace
 ```
 
-### Running the binary
+### Running the server
 
 The marketplace server can be ran using the `server` sub-command.
 
 ```console
-./code-marketplace server --extensions-dir ./extensions
+./code-marketplace server [flags]
 ```
 
 Run `./code-marketplace --help` for a full list of options.
+
+### Local storage
+
+To use a local directory for extension storage use the `--extensions-dir` flag.
+
+```console
+
+./code-marketplace [command] --extensions-dir ./extensions
+```
+
+### Artifactory storage
+
+It is possible use Artifactory as a file store instead of local storage. For
+this to work the `ARTIFACTORY_TOKEN` environment variable must be set.
+
+```console
+export ARTIFACTORY_TOKEN="my-token"
+./code-marketplace [command] --artifactory http://artifactory.server/artifactory --repo extensions
+```
 
 ### Exposing the marketplace
 
@@ -71,8 +90,8 @@ Extensions can be added to the marketplace by file or URL. The extensions
 directory does not need to be created beforehand.
 
 ```console
-./code-marketplace add extension.vsix --extensions-dir ./extensions
-./code-marketplace add https://domain.tld/extension.vsix --extensions-dir ./extensions
+./code-marketplace add extension.vsix [flags]
+./code-marketplace add https://domain.tld/extension.vsix [flags]
 ```
 
 If the extension has dependencies or is in an extension pack those details will
@@ -88,13 +107,14 @@ If an extension is open source you can get it from one of three locations:
 For example to add the Python extension from Open VSX:
 
 ```console
-./code-marketplace add https://open-vsx.org/api/ms-python/python/2022.14.0/file/ms-python.python-2022.14.0.vsix --extensions-dir ./extensions
+./code-marketplace add https://open-vsx.org/api/ms-python/python/2022.14.0/file/ms-python.python-2022.14.0.vsix [flags]
 ```
 
 Or the Vim extension from GitHub:
 
 ```console
-./code-marketplace add https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix --extensions-dir ./extensions
+./code-marketplace add
+https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix [flags]
 ```
 
 ## Removing extensions
@@ -103,8 +123,8 @@ Extensions can be removed from the marketplace by ID and version (or use `--all`
 to remove all versions).
 
 ```console
-./code-marketplace remove ms-python.python-2022.14.0 --extensions-dir ./extensions
-./code-marketplace remove ms-python.python --all --extensions-dir ./extensions
+./code-marketplace remove ms-python.python-2022.14.0 [flags]
+./code-marketplace remove ms-python.python --all [flags]
 ```
 
 ## Usage in code-server
@@ -121,8 +141,8 @@ marketplace is running behind an https URL.
 
 ```console
 make test
-mkdir -p extensions
-go run ./cmd/marketplace/main.go server --extensions-dir ./extensions
+mkdir extensions
+go run ./cmd/marketplace/main.go server [flags]
 ```
 
 When testing with code-server you may run into issues with content security
@@ -148,4 +168,6 @@ update the changelog as part of your PR.
 
 ## Planned work
 
-- jFrog integration for file storage.
+- Bulk add.
+- Bulk add from one Artifactory repository to another (or to itself).
+- Progress indicators when adding/removing extensions.
