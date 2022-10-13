@@ -357,22 +357,22 @@ func TestReadVSIXManifest(t *testing.T) {
 		{
 			name:  "MissingManifest",
 			error: "not found",
-			vsix:  testutil.CreateVSIX(t, nil),
+			vsix:  testutil.CreateVSIX(t, nil, nil),
 		},
 		{
 			name:  "EmptyManifest",
 			error: "EOF",
-			vsix:  testutil.CreateVSIX(t, []byte("")),
+			vsix:  testutil.CreateVSIX(t, []byte(""), nil),
 		},
 		{
 			name:  "TextFileManifest",
 			error: "EOF",
-			vsix:  testutil.CreateVSIX(t, []byte("just some random text")),
+			vsix:  testutil.CreateVSIX(t, []byte("just some random text"), nil),
 		},
 		{
 			name:  "ManifestSyntaxError",
 			error: "XML syntax error",
-			vsix:  testutil.CreateVSIX(t, []byte("<PackageManifest/PackageManifest>")),
+			vsix:  testutil.CreateVSIX(t, []byte("<PackageManifest/PackageManifest>"), nil),
 		},
 		{
 			name:  "ManifestMissingPublisher",
@@ -419,6 +419,74 @@ func TestReadVSIXManifest(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.manifest, manifest)
+			}
+		})
+	}
+}
+
+func TestReadVSIXPackageJson(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// error is the expected error, if any.
+		error string
+		// json is the package.json from which to create the VSIX.  Use `vsix` to
+		// specify raw bytes instead.
+		json *storage.VSIXPackageJSON
+		// name is the name of the test.
+		name string
+		// vsix contains the raw bytes for the VSIX from which to read the manifest.
+		// If omitted it will be created from `manifest`.  For non-error cases
+		// always use `manifest` instead so the result can be checked.
+		vsix []byte
+	}{
+		{
+			name: "OK",
+			json: &storage.VSIXPackageJSON{},
+		},
+		{
+			name: "WithBrowser",
+			json: &storage.VSIXPackageJSON{
+				Browser: "foo",
+			},
+		},
+		{
+			name:  "MissingPackageJson",
+			error: "not found",
+			vsix:  testutil.CreateVSIX(t, nil, nil),
+		},
+		{
+			name:  "EmptyPackageJson",
+			error: "EOF",
+			vsix:  testutil.CreateVSIX(t, nil, []byte("")),
+		},
+		{
+			name:  "TextFilePackageJson",
+			error: "invalid character",
+			vsix:  testutil.CreateVSIX(t, nil, []byte("just some random text")),
+		},
+		{
+			name:  "PackageJsonSyntaxError",
+			error: "invalid character",
+			vsix:  testutil.CreateVSIX(t, nil, []byte("{\"foo\": bar}")),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			vsix := test.vsix
+			if vsix == nil {
+				vsix = testutil.CreateVSIXFromPackageJSON(t, test.json)
+			}
+			json, err := storage.ReadVSIXPackageJSON(vsix, "extension/package.json")
+			if test.error != "" {
+				require.Error(t, err)
+				require.Regexp(t, test.error, err.Error())
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.json, json)
 			}
 		})
 	}

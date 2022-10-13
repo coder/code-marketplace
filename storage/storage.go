@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -79,7 +80,8 @@ type VSIXAssets struct {
 type AssetType string
 
 const (
-	VSIXAssetType AssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
+	ManifestAssetType AssetType = "Microsoft.VisualStudio.Code.Manifest" // This is the package.json.
+	VSIXAssetType     AssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
 )
 
 // VSIXAsset implements XMLManifest.PackageManifest.Assets.Asset.
@@ -117,8 +119,8 @@ type Storage interface {
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error
 }
 
-// Read and parse an extension manifest from a vsix file.  If the manifest is
-// invalid it will be returned along with the validation error.
+// ReadVSIXManifest reads and parses an extension manifest from a vsix file.  If
+// the manifest is invalid it will be returned along with the validation error.
 func ReadVSIXManifest(vsix []byte) (*VSIXManifest, error) {
 	vmr, err := GetZipFileReader(vsix, "extension.vsixmanifest")
 	if err != nil {
@@ -128,18 +130,16 @@ func ReadVSIXManifest(vsix []byte) (*VSIXManifest, error) {
 	return parseVSIXManifest(vmr)
 }
 
-// Parse an extension manifest from a reader.  If the manifest is invalid it
-// will be returned along with the validation error.
+// parseVSIXManifest parses an extension manifest from a reader.  If the
+// manifest is invalid it will be returned along with the validation error.
 func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
 	var vm *VSIXManifest
-
 	decoder := xml.NewDecoder(reader)
 	decoder.Strict = false
 	err := decoder.Decode(&vm)
 	if err != nil {
 		return nil, err
 	}
-
 	return vm, validateManifest(vm)
 }
 
@@ -155,6 +155,28 @@ func validateManifest(manifest *VSIXManifest) error {
 	}
 
 	return nil
+}
+
+// VSIXPackageJSON partially implements Manifest.
+// https://github.com/microsoft/vscode-vsce/blob/main/src/manifest.ts#L40-L99
+type VSIXPackageJSON struct {
+	Browser string `json:"browser"`
+}
+
+// ReadVSIXPackageJSON reads and parses an extension's package.json from a vsix
+// file.
+func ReadVSIXPackageJSON(vsix []byte, packageJsonPath string) (*VSIXPackageJSON, error) {
+	vpjr, err := GetZipFileReader(vsix, packageJsonPath)
+	if err != nil {
+		return nil, err
+	}
+	defer vpjr.Close()
+	var pj *VSIXPackageJSON
+	err = json.NewDecoder(vpjr).Decode(&pj)
+	if err != nil {
+		return nil, err
+	}
+	return pj, nil
 }
 
 // ReadVSIX reads the bytes of a VSIX from the specified source.  The source

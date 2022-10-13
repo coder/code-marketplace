@@ -3,6 +3,7 @@ package testutil
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -153,11 +154,14 @@ type file struct {
 }
 
 // createVSIX returns the bytes for a VSIX file containing the provided raw
-// manifest bytes (if not nil) and an icon.
-func CreateVSIX(t *testing.T, manifestBytes []byte) []byte {
+// manifest and package.json bytes (if not nil) and an icon.
+func CreateVSIX(t *testing.T, manifestBytes []byte, packageJSONBytes []byte) []byte {
 	files := []file{{"icon.png", []byte("fake icon")}}
 	if manifestBytes != nil {
 		files = append(files, file{"extension.vsixmanifest", manifestBytes})
+	}
+	if packageJSONBytes != nil {
+		files = append(files, file{"extension/package.json", packageJSONBytes})
 	}
 	buf := bytes.NewBuffer(nil)
 	zw := zip.NewWriter(buf)
@@ -177,7 +181,13 @@ func CreateVSIX(t *testing.T, manifestBytes []byte) []byte {
 func CreateVSIXFromManifest(t *testing.T, manifest *storage.VSIXManifest) []byte {
 	manifestBytes, err := xml.Marshal(manifest)
 	require.NoError(t, err)
-	return CreateVSIX(t, manifestBytes)
+	return CreateVSIX(t, manifestBytes, nil)
+}
+
+func CreateVSIXFromPackageJSON(t *testing.T, packageJSON *storage.VSIXPackageJSON) []byte {
+	packageJSONBytes, err := json.Marshal(packageJSON)
+	require.NoError(t, err)
+	return CreateVSIX(t, nil, packageJSONBytes)
 }
 
 // CreateVSIXFromExtension returns the bytes for a VSIX file containing the
