@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -217,6 +218,16 @@ func TestAPI(t *testing.T) {
 			Path:   "/item",
 			Status: http.StatusOK,
 		},
+		{
+			Name:   "WebExtensionStat",
+			Path:   "/api/itemName/vscodevim.vim/version/1.23.1/statType/1/vscodewebextension",
+			Status: http.StatusOK,
+		},
+		{
+			Name:   "ExtensionStat",
+			Path:   "/api/publishers/vscodevim/extensions/vim/1.23.1/stats?statType=1",
+			Status: http.StatusOK,
+		},
 	}
 
 	for _, c := range cases {
@@ -245,7 +256,7 @@ func TestAPI(t *testing.T) {
 
 			var resp *http.Response
 			var err error
-			if c.Path == "/api/extensionquery" {
+			if strings.HasPrefix(c.Path, "/api") {
 				var body []byte
 				if str, ok := c.Request.(string); ok {
 					body = []byte(str)

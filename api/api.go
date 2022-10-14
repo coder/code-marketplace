@@ -128,6 +128,17 @@ func New(options *Options) *API {
 		httpapi.WriteBytes(rw, http.StatusOK, []byte("Extension pages are not supported"))
 	})
 
+	// Web extensions post stats to this endpoint.
+	r.Post("/api/itemName/{publisher}.{name}/version/{version}/statType/{type}/vscodewebextension", func(rw http.ResponseWriter, r *http.Request) {
+		httpapi.WriteBytes(rw, http.StatusOK, []byte("Extension stats are not supported"))
+	})
+
+	// Non-web extensions post stats to this endpoint.
+	r.Post("/api/publishers/{publisher}/extensions/{name}/{version}/stats", func(rw http.ResponseWriter, r *http.Request) {
+		// Will have a `statType` query param.
+		httpapi.WriteBytes(rw, http.StatusOK, []byte("Extension stats are not supported"))
+	})
+
 	return api
 }
 
