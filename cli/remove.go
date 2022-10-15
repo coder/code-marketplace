@@ -46,7 +46,7 @@ func remove() *cobra.Command {
 				logger = logger.Leveled(slog.LevelDebug)
 			}
 
-			store, err := storage.NewStorage(&storage.Options{
+			store, err := storage.NewStorage(ctx, &storage.Options{
 				Artifactory: artifactory,
 				ExtDir:      extdir,
 				Logger:      logger,

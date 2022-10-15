@@ -130,13 +130,13 @@ type Storage interface {
 // NewStorage returns a storage instance based on the provided extension
 // directory or Artifactory URL.  If neither or both are provided an error is
 // returned.
-func NewStorage(options *Options) (Storage, error) {
+func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 	if (options.Repo != "" || options.Artifactory != "") && options.ExtDir != "" {
 		return nil, xerrors.Errorf("cannot use both Artifactory and extension directory")
 	} else if options.Artifactory != "" && options.Repo == "" {
 		return nil, xerrors.Errorf("must provide repository")
 	} else if options.Artifactory != "" {
-		return NewArtifactoryStorage(options.Artifactory, options.Repo, options.Logger)
+		return NewArtifactoryStorage(ctx, options.Artifactory, options.Repo, options.Logger)
 	} else if options.ExtDir != "" {
 		return NewLocalStorage(options.ExtDir, options.Logger)
 	}
@@ -227,12 +227,17 @@ func ReadVSIX(ctx context.Context, source string) ([]byte, error) {
 	})
 }
 
-// ExtensionID returns the full ID of an extension.
-func ExtensionID(manifest *VSIXManifest) string {
-	return fmt.Sprintf("%s.%s-%s",
+// ExtensionIDFromManifest returns the full ID of an extension.
+func ExtensionIDFromManifest(manifest *VSIXManifest) string {
+	return ExtensionID(
 		manifest.Metadata.Identity.Publisher,
 		manifest.Metadata.Identity.ID,
 		manifest.Metadata.Identity.Version)
+}
+
+// ExtensionID returns the full ID of an extension.
+func ExtensionID(publisher, name, version string) string {
+	return fmt.Sprintf("%s.%s-%s", publisher, name, version)
 }
 
 // ParseExtensionID parses an extension ID into its separate parts: publisher,

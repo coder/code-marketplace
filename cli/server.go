@@ -52,7 +52,7 @@ func server() *cobra.Command {
 				logger = logger.Leveled(slog.LevelDebug)
 			}
 
-			store, err := storage.NewStorage(&storage.Options{
+			store, err := storage.NewStorage(ctx, &storage.Options{
 				Artifactory: artifactory,
 				ExtDir:      extdir,
 				Logger:      logger,
@@ -73,7 +73,7 @@ func server() *cobra.Command {
 			if !valid {
 				return xerrors.New("must be listening on tcp")
 			}
-			logger.Info(ctx, "Starting API server", slog.F("address", tcpAddr))
+			logger.Info(ctx, "Started API server", slog.F("address", tcpAddr))
 
 			// Always no database for now.
 			database := &database.NoDB{

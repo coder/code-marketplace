@@ -42,7 +42,7 @@ func add() *cobra.Command {
 				logger = logger.Leveled(slog.LevelDebug)
 			}
 
-			store, err := storage.NewStorage(&storage.Options{
+			store, err := storage.NewStorage(ctx, &storage.Options{
 				Artifactory: artifactory,
 				ExtDir:      extdir,
 				Logger:      logger,
@@ -85,7 +85,7 @@ func add() *cobra.Command {
 			}
 
 			depCount := len(deps)
-			id := storage.ExtensionID(manifest)
+			id := storage.ExtensionIDFromManifest(manifest)
 			summary := []string{
 				fmt.Sprintf("Unpacked %s to %s", id, location),
 				fmt.Sprintf("%s has %s", id, util.Plural(depCount, "dependency", "dependencies")),

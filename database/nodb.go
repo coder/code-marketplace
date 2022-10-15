@@ -2,13 +2,16 @@ package database
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"os"
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
+	"golang.org/x/sync/errgroup"
 
 	"cdr.dev/slog"
 
@@ -52,6 +55,7 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, baseURL url.URL) ([]*Extension, int, error) {
 	vscodeExts := []*noDBExtension{}
 
+	start := time.Now()
 	err := db.Storage.WalkExtensions(ctx, func(manifest *storage.VSIXManifest, versions []string) error {
 		vscodeExt := convertManifestToExtension(manifest)
 		if matched, distances := getMatches(vscodeExt, filter); matched {
@@ -66,9 +70,22 @@ func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, ba
 	}
 
 	total := len(vscodeExts)
+	db.Logger.Debug(ctx, "walk extensions", slog.F("took", time.Since(start)), slog.F("count", total))
+
+	start = time.Now()
 	sortExtensions(vscodeExts, filter)
+	db.Logger.Debug(ctx, "sort extensions", slog.F("took", time.Since(start)))
+
+	start = time.Now()
 	vscodeExts = paginateExtensions(vscodeExts, filter)
-	db.handleFlags(ctx, vscodeExts, flags, baseURL)
+	db.Logger.Debug(ctx, "paginate extensions", slog.F("took", time.Since(start)))
+
+	start = time.Now()
+	err = db.handleFlags(ctx, vscodeExts, flags, baseURL)
+	if err != nil {
+		return nil, 0, err
+	}
+	db.Logger.Debug(ctx, "handle flags", slog.F("took", time.Since(start)))
 
 	convertedExts := []*Extension{}
 	for _, ext := range vscodeExts {
@@ -250,7 +267,8 @@ func paginateExtensions(exts []*noDBExtension, filter Filter) []*noDBExtension {
 	return exts[start:end]
 }
 
-func (db *NoDB) handleFlags(ctx context.Context, exts []*noDBExtension, flags Flag, baseURL url.URL) {
+func (db *NoDB) handleFlags(ctx context.Context, exts []*noDBExtension, flags Flag, baseURL url.URL) error {
+	var eg errgroup.Group
 	for _, ext := range exts {
 		// Files, properties, and asset URIs are part of versions so if they are set
 		// assume we also want to include versions.
@@ -259,7 +277,17 @@ func (db *NoDB) handleFlags(ctx context.Context, exts []*noDBExtension, flags Fl
 			flags&IncludeVersionProperties != 0 ||
 			flags&IncludeLatestVersionOnly != 0 ||
 			flags&IncludeAssetURI != 0 {
-			ext.Versions = db.getVersions(ctx, ext, flags, baseURL)
+			// Depending on the storage mechanism fetching a manifest can be very
+			// slow so run the requests in parallel.
+			ext := ext
+			eg.Go(func() error {
+				versions, err := db.getVersions(ctx, ext, flags, baseURL)
+				if err != nil {
+					return err
+				}
+				ext.Versions = versions
+				return nil
+			})
 		}
 
 		// TODO: This does not seem to be included in any interfaces so no idea
@@ -279,9 +307,10 @@ func (db *NoDB) handleFlags(ctx context.Context, exts []*noDBExtension, flags Fl
 		// if flags&IncludeStatistics != 0 {}
 		// if flags&Unpublished != 0 {}
 	}
+	return eg.Wait()
 }
 
-func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag, baseURL url.URL) []ExtVersion {
+func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag, baseURL url.URL) ([]ExtVersion, error) {
 	ctx = slog.With(ctx,
 		slog.F("publisher", ext.Publisher.PublisherName),
 		slog.F("extension", ext.Name))
@@ -295,8 +324,10 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 	for _, versionStr := range versionStrs {
 		ctx := slog.With(ctx, slog.F("version", versionStr))
 		manifest, err := db.Storage.Manifest(ctx, ext.Publisher.PublisherName, ext.Name, versionStr)
-		if err != nil {
-			db.Logger.Error(ctx, "Unable to parse version manifest", slog.Error(err))
+		if err != nil && errors.Is(err, context.Canceled) {
+			return nil, err
+		} else if err != nil {
+			db.Logger.Error(ctx, "Unable to read version manifest", slog.Error(err))
 			continue
 		}
 
@@ -354,7 +385,7 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 
 		versions = append(versions, version)
 	}
-	return versions
+	return versions, nil
 }
 
 // noDBExtension adds some properties for internally filtering.

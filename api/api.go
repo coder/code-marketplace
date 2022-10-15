@@ -197,7 +197,7 @@ func (api *API) extensionQuery(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		api.Logger.Debug(ctx, "Got extensions for filter",
+		api.Logger.Debug(ctx, "got extensions for filter",
 			slog.F("filter", filter),
 			slog.F("count", count))
 

@@ -56,7 +56,7 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	}
 
 	// Copy the VSIX itself as well.
-	vsixPath := filepath.Join(dir, fmt.Sprintf("%s.vsix", ExtensionID(manifest)))
+	vsixPath := filepath.Join(dir, fmt.Sprintf("%s.vsix", ExtensionIDFromManifest(manifest)))
 	err = os.WriteFile(vsixPath, vsix, 0o644)
 	if err != nil {
 		return "", err
@@ -87,7 +87,7 @@ func (s *Local) Manifest(ctx context.Context, publisher, name, version string) (
 
 	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 		Type:        VSIXAssetType,
-		Path:        fmt.Sprintf("%s.vsix", ExtensionID(manifest)),
+		Path:        fmt.Sprintf("%s.vsix", ExtensionIDFromManifest(manifest)),
 		Addressable: "true",
 	})
 

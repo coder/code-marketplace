@@ -33,7 +33,7 @@ func newStorage(t *testing.T, dir string) storage.Storage {
 func TestNewStorage(t *testing.T) {
 	t.Run("Local", func(t *testing.T) {
 		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		s, err := storage.NewStorage(&storage.Options{
+		s, err := storage.NewStorage(context.Background(), &storage.Options{
 			ExtDir: "/extensions",
 		})
 		require.NoError(t, err)
@@ -43,7 +43,7 @@ func TestNewStorage(t *testing.T) {
 
 	t.Run("ArtifactoryKey", func(t *testing.T) {
 		t.Setenv(storage.ArtifactoryTokenEnvKey, "foo")
-		s, err := storage.NewStorage(&storage.Options{
+		s, err := storage.NewStorage(context.Background(), &storage.Options{
 			Artifactory: "coder.com",
 			Repo:        "extensions",
 		})
@@ -54,7 +54,7 @@ func TestNewStorage(t *testing.T) {
 
 	t.Run("ArtifactoryNoKey", func(t *testing.T) {
 		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(&storage.Options{
+		_, err := storage.NewStorage(context.Background(), &storage.Options{
 			Artifactory: "coder.com",
 			Repo:        "extensions",
 		})
@@ -63,7 +63,7 @@ func TestNewStorage(t *testing.T) {
 
 	t.Run("NoRepo", func(t *testing.T) {
 		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(&storage.Options{
+		_, err := storage.NewStorage(context.Background(), &storage.Options{
 			Artifactory: "coder.com",
 		})
 		require.Error(t, err)
@@ -71,13 +71,13 @@ func TestNewStorage(t *testing.T) {
 
 	t.Run("Both", func(t *testing.T) {
 		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(&storage.Options{
+		_, err := storage.NewStorage(context.Background(), &storage.Options{
 			Artifactory: "coder.com",
 			ExtDir:      "/extensions",
 		})
 		require.Error(t, err)
 
-		_, err = storage.NewStorage(&storage.Options{
+		_, err = storage.NewStorage(context.Background(), &storage.Options{
 			ExtDir: "/extensions",
 			Repo:   "extensions",
 		})
@@ -86,7 +86,7 @@ func TestNewStorage(t *testing.T) {
 
 	t.Run("None", func(t *testing.T) {
 		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(&storage.Options{})
+		_, err := storage.NewStorage(context.Background(), &storage.Options{})
 		require.Error(t, err)
 	})
 }
@@ -832,7 +832,7 @@ func TestExtensionID(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, test.expected, storage.ExtensionID(test.manifest))
+			require.Equal(t, test.expected, storage.ExtensionIDFromManifest(test.manifest))
 		})
 	}
 }
