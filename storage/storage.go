@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/xerrors"
 
@@ -142,7 +143,13 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 		if token == "" {
 			return nil, xerrors.Errorf("the %s environment variable must be set", ArtifactoryTokenEnvKey)
 		}
-		return NewArtifactoryStorage(ctx, options.Artifactory, options.Repo, token, options.Logger)
+		return NewArtifactoryStorage(ctx, &ArtifactoryOptions{
+			ListCacheDuration: time.Minute,
+			Logger:            options.Logger,
+			Repo:              options.Repo,
+			Token:             token,
+			URI:               options.Artifactory,
+		})
 	} else if options.ExtDir != "" {
 		return NewLocalStorage(options.ExtDir, options.Logger)
 	}

@@ -59,19 +59,29 @@ type Artifactory struct {
 	uri             string
 }
 
-func NewArtifactoryStorage(ctx context.Context, uri, repo, token string, logger slog.Logger) (*Artifactory, error) {
+type ArtifactoryOptions struct {
+	// How long to cache list responses.  Zero means no cache.  Manifests are
+	// currently cached indefinitely since they do not change.
+	ListCacheDuration time.Duration
+	Logger            slog.Logger
+	Repo              string
+	Token             string
+	URI               string
+}
+
+func NewArtifactoryStorage(ctx context.Context, options *ArtifactoryOptions) (*Artifactory, error) {
+	uri := options.URI
 	if !strings.HasSuffix(uri, "/") {
 		uri = uri + "/"
 	}
 
 	s := &Artifactory{
-		// TODO: Should probably make the duration configurable?  And/or have a
-		// command for ejecting the cache?  Maybe automatically when you run the add
-		// or remove commands.
-		listDuration: time.Minute,
-		logger:       logger,
-		repo:         path.Clean(repo),
-		token:        token,
+		// TODO: Eject the cache when adding/removing extensions and/or add a
+		// command to eject the cache?
+		listDuration: options.ListCacheDuration,
+		logger:       options.Logger,
+		repo:         path.Clean(options.Repo),
+		token:        options.Token,
 		uri:          uri,
 	}
 
@@ -332,7 +342,7 @@ func (s *Artifactory) listWithCache(ctx context.Context) *[]ArtifactoryFile {
 	if s.listCache == nil || time.Now().After(s.listExpiration) {
 		s.listExpiration = time.Now().Add(s.listDuration)
 		list, _, err := s.list(ctx, "/", 3)
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			s.logger.Error(ctx, "Error reading extensions", slog.Error(err))
 		}
 		s.listCache = &list

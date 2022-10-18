@@ -127,6 +127,10 @@ func TestStorage(t *testing.T) {
 			name:    "Local",
 			factory: localFactory,
 		},
+		{
+			name:    "Artifactory",
+			factory: artifactoryFactory,
+		},
 	}
 	for _, sf := range factories {
 		t.Run(sf.name, func(t *testing.T) {
@@ -698,9 +702,6 @@ func testAddExtension(t *testing.T, factory storageFactory) {
 		extension testutil.Extension
 		// name is the name of the test.
 		name string
-		// skip indicates whether to skip the test since some failure modes are
-		// platform-dependent.
-		skip bool
 		// vsix contains the raw bytes of the extension to add.  If omitted it will
 		// be created from `extension`.  For non-error cases always use `extension`
 		// instead so we can check the result.
@@ -726,7 +727,7 @@ func testAddExtension(t *testing.T, factory storageFactory) {
 		{
 			name:      "CopyOverDirectory",
 			extension: testutil.Extensions[3],
-			error:     "is a directory",
+			error:     "is a directory|found a folder",
 		},
 	}
 
@@ -740,9 +741,6 @@ func testAddExtension(t *testing.T, factory storageFactory) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if test.skip {
-				t.Skip()
-			}
 			expected := &storage.VSIXManifest{}
 			vsix := test.vsix
 			if vsix == nil {

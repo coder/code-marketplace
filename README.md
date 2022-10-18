@@ -140,7 +140,6 @@ marketplace is running behind an https URL.
 ## Development
 
 ```console
-make test
 mkdir extensions
 go run ./cmd/marketplace/main.go server [flags]
 ```
@@ -152,6 +151,23 @@ the policy in code-server's source.
 
 When you make a change that affects people deploying the marketplace please
 update the changelog as part of your PR.
+
+### Tests
+
+To run the tests:
+
+```
+make test
+```
+
+To run the Artifactory tests against a real repository instead of a mock:
+
+```
+export ARTIFACTORY_URI=myuri
+export ARTIFACTORY_REPO=myrepo
+export ARTIFACTORY_TOKEN=mytoken
+make test
+```
 
 ## Missing features
 
