@@ -24,8 +24,6 @@ import (
 	"github.com/coder/code-marketplace/util"
 )
 
-const ArtifactoryTokenEnvKey = "ARTIFACTORY_TOKEN"
-
 type ArtifactoryError struct {
 	Status  int    `json:"status"`
 	Message string `json:"message"`
@@ -61,12 +59,7 @@ type Artifactory struct {
 	uri             string
 }
 
-func NewArtifactoryStorage(ctx context.Context, uri, repo string, logger slog.Logger) (*Artifactory, error) {
-	token := os.Getenv(ArtifactoryTokenEnvKey)
-	if token == "" {
-		return nil, xerrors.Errorf("the %s environment variable must be set", ArtifactoryTokenEnvKey)
-	}
-
+func NewArtifactoryStorage(ctx context.Context, uri, repo, token string, logger slog.Logger) (*Artifactory, error) {
 	if !strings.HasSuffix(uri, "/") {
 		uri = uri + "/"
 	}

@@ -127,6 +127,8 @@ type Storage interface {
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error
 }
 
+const ArtifactoryTokenEnvKey = "ARTIFACTORY_TOKEN"
+
 // NewStorage returns a storage instance based on the provided extension
 // directory or Artifactory URL.  If neither or both are provided an error is
 // returned.
@@ -136,7 +138,11 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 	} else if options.Artifactory != "" && options.Repo == "" {
 		return nil, xerrors.Errorf("must provide repository")
 	} else if options.Artifactory != "" {
-		return NewArtifactoryStorage(ctx, options.Artifactory, options.Repo, options.Logger)
+		token := os.Getenv(ArtifactoryTokenEnvKey)
+		if token == "" {
+			return nil, xerrors.Errorf("the %s environment variable must be set", ArtifactoryTokenEnvKey)
+		}
+		return NewArtifactoryStorage(ctx, options.Artifactory, options.Repo, token, options.Logger)
 	} else if options.ExtDir != "" {
 		return NewLocalStorage(options.ExtDir, options.Logger)
 	}
