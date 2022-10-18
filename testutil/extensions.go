@@ -5,9 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -124,28 +121,10 @@ func ConvertExtensionToManifest(ext Extension, version string) *storage.VSIXMani
 	}
 }
 
-// AddExtension adds the provided test extension to the provided directory.
-func AddExtension(t *testing.T, ext Extension, extdir, version string) *storage.VSIXManifest {
-	dir := filepath.Join(extdir, ext.Publisher, ext.Name, version)
-	err := os.MkdirAll(dir, 0o755)
+func ConvertExtensionToManifestBytes(t *testing.T, ext Extension, version string) []byte {
+	manifestBytes, err := xml.Marshal(ConvertExtensionToManifest(ext, version))
 	require.NoError(t, err)
-
-	manifest := ConvertExtensionToManifest(ext, version)
-	rawManifest, err := xml.Marshal(manifest)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(dir, "extension.vsixmanifest"), rawManifest, 0o644)
-	require.NoError(t, err)
-
-	// The storage interface should add the extension asset when it reads the
-	// manifest since it is not on the actual manifest on disk.
-	manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
-		Type:        storage.VSIXAssetType,
-		Path:        fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, version),
-		Addressable: "true",
-	})
-
-	return manifest
+	return manifestBytes
 }
 
 type file struct {

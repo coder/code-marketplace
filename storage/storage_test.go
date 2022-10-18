@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,144 +18,267 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/mod/semver"
 
-	"cdr.dev/slog"
-	"cdr.dev/slog/sloggers/slogtest"
 	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/testutil"
 )
 
-func newStorage(t *testing.T, dir string) storage.Storage {
-	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
-	s, err := storage.NewLocalStorage(dir, logger)
-	require.NoError(t, err)
-	return s
+type testStorage struct {
+	storage storage.Storage
+	write   func(content []byte, elem ...string)
+	exists  func(elem ...string) bool
 }
+type storageFactory = func(t *testing.T) testStorage
 
 func TestNewStorage(t *testing.T) {
-	t.Run("Local", func(t *testing.T) {
-		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		s, err := storage.NewStorage(context.Background(), &storage.Options{
-			ExtDir: "/extensions",
-		})
-		require.NoError(t, err)
-		_, ok := s.(*storage.Local)
-		require.True(t, ok)
-	})
+	tests := []struct {
+		// error is the expected error, if any
+		error string
+		// local indicates whether the storage is local.
+		local bool
+		// name is the name of the test
+		name string
+		// options are the options to use to create the storage.
+		options *storage.Options
+		// token is the Artifactory token.
+		token string
+	}{
+		{
+			name: "Local",
+			options: &storage.Options{
+				ExtDir: "/extensions",
+			},
+			local: true,
+		},
+		{
+			name:  "ArtifactoryWithToken",
+			token: "foo",
+			options: &storage.Options{
+				Artifactory: "coder.com",
+				Repo:        "extensions",
+			},
+		},
+		{
+			name:  "ArtifactoryWithoutKey",
+			error: "environment variable must be set",
+			options: &storage.Options{
+				Artifactory: "coder.com",
+				Repo:        "extensions",
+			},
+		},
+		{
+			name:  "ArtifactoryWithoutRepo",
+			error: "must provide repository",
+			token: "foo",
+			options: &storage.Options{
+				Artifactory: "coder.com",
+			},
+		},
+		{
+			name:  "DirAndArtifactory",
+			error: "cannot use both",
+			options: &storage.Options{
+				ExtDir: "/extensions",
+				Repo:   "extensions",
+			},
+		},
+		{
+			name:  "DirAndRepo",
+			error: "cannot use both",
+			options: &storage.Options{
+				ExtDir: "/extensions",
+				Repo:   "extensions",
+			},
+		},
+		{
+			name:    "None",
+			error:   "must provide an Artifactory repository or local directory",
+			options: &storage.Options{},
+		},
+	}
 
-	t.Run("ArtifactoryKey", func(t *testing.T) {
-		t.Setenv(storage.ArtifactoryTokenEnvKey, "foo")
-		s, err := storage.NewStorage(context.Background(), &storage.Options{
-			Artifactory: "coder.com",
-			Repo:        "extensions",
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(storage.ArtifactoryTokenEnvKey, test.token)
+			s, err := storage.NewStorage(context.Background(), test.options)
+			if test.error != "" {
+				require.Error(t, err)
+				require.Regexp(t, test.error, err.Error())
+			} else if test.local {
+				_, ok := s.(*storage.Local)
+				require.True(t, ok)
+				require.NoError(t, err)
+			} else {
+				_, ok := s.(*storage.Artifactory)
+				require.True(t, ok)
+				require.NoError(t, err)
+			}
 		})
-		require.NoError(t, err)
-		_, ok := s.(*storage.Artifactory)
-		require.True(t, ok)
-	})
-
-	t.Run("ArtifactoryNoKey", func(t *testing.T) {
-		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(context.Background(), &storage.Options{
-			Artifactory: "coder.com",
-			Repo:        "extensions",
-		})
-		require.Error(t, err)
-	})
-
-	t.Run("NoRepo", func(t *testing.T) {
-		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(context.Background(), &storage.Options{
-			Artifactory: "coder.com",
-		})
-		require.Error(t, err)
-	})
-
-	t.Run("Both", func(t *testing.T) {
-		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(context.Background(), &storage.Options{
-			Artifactory: "coder.com",
-			ExtDir:      "/extensions",
-		})
-		require.Error(t, err)
-
-		_, err = storage.NewStorage(context.Background(), &storage.Options{
-			ExtDir: "/extensions",
-			Repo:   "extensions",
-		})
-		require.Error(t, err)
-	})
-
-	t.Run("None", func(t *testing.T) {
-		t.Setenv(storage.ArtifactoryTokenEnvKey, "")
-		_, err := storage.NewStorage(context.Background(), &storage.Options{})
-		require.Error(t, err)
-	})
+	}
 }
 
-func TestFileServer(t *testing.T) {
+func TestStorage(t *testing.T) {
 	t.Parallel()
-
-	dir := t.TempDir()
-	file := filepath.Join(dir, "foo")
-	err := os.WriteFile(file, []byte("bar"), 0o644)
-	require.NoError(t, err)
-
-	s := newStorage(t, dir)
-	server := s.FileServer()
-
-	req := httptest.NewRequest("GET", "/foo", nil)
-	rec := httptest.NewRecorder()
-	server.ServeHTTP(rec, req)
-
-	resp := rec.Result()
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	require.Equal(t, "bar", string(body))
+	factories := []struct {
+		name    string
+		factory storageFactory
+	}{
+		{
+			name:    "Local",
+			factory: localFactory,
+		},
+	}
+	for _, sf := range factories {
+		t.Run(sf.name, func(t *testing.T) {
+			t.Run("AddExtension", func(t *testing.T) {
+				testAddExtension(t, sf.factory)
+			})
+			t.Run("RemoveExtension", func(t *testing.T) {
+				testRemoveExtension(t, sf.factory)
+			})
+			t.Run("FileServer", func(t *testing.T) {
+				testFileServer(t, sf.factory)
+			})
+			t.Run("Manifest", func(t *testing.T) {
+				testManifest(t, sf.factory)
+			})
+			t.Run("WalkExtensions", func(t *testing.T) {
+				testWalkExtensions(t, sf.factory)
+			})
+			t.Run("Versions", func(t *testing.T) {
+				testVersions(t, sf.factory)
+			})
+		})
+	}
 }
 
-func TestManifest(t *testing.T) {
+func testFileServer(t *testing.T, factory storageFactory) {
 	t.Parallel()
 
-	t.Run("OK", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		// content is the expected content when there is no error.
+		content string
+		// error is the expected error code, if any.
+		error int
+		// name is the name of the test.
+		name string
+		// path is the path to request.
+		path string
+	}{
+		{
+			name:    "OK",
+			content: "baz",
+			path:    "/foo/bar",
+		},
+		{
+			name:  "NotFound",
+			error: http.StatusNotFound,
+			path:  "/qux",
+		},
+	}
 
-		extdir := t.TempDir()
-		ext := testutil.Extensions[0]
-		expected := testutil.AddExtension(t, ext, extdir, "some-version")
+	f := factory(t)
+	f.write([]byte("baz"), "foo", "bar")
 
-		s := newStorage(t, extdir)
-		manifest, err := s.Manifest(context.Background(), ext.Publisher, ext.Name, "some-version")
-		require.NoError(t, err)
-		require.Equal(t, expected, manifest)
-	})
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", test.path, nil)
+			rec := httptest.NewRecorder()
 
-	t.Run("ParseError", func(t *testing.T) {
-		t.Parallel()
+			server := f.storage.FileServer()
+			server.ServeHTTP(rec, req)
 
-		extdir := t.TempDir()
-		dir := filepath.Join(extdir, "foo/bar/baz")
-		err := os.MkdirAll(dir, 0o755)
-		require.NoError(t, err)
+			resp := rec.Result()
+			defer resp.Body.Close()
 
-		file := filepath.Join(dir, "extension.vsixmanifest")
-		err = os.WriteFile(file, []byte("invalid"), 0o644)
-		require.NoError(t, err)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
 
-		s := newStorage(t, extdir)
-		_, err = s.Manifest(context.Background(), "foo", "bar", "baz")
-		require.Error(t, err)
-	})
+			if test.error != 0 {
+				require.Equal(t, test.error, resp.StatusCode)
+			} else {
+				require.Equal(t, test.content, string(body))
+			}
+		})
+	}
+}
 
-	t.Run("Missing", func(t *testing.T) {
-		t.Parallel()
+func testManifest(t *testing.T, factory storageFactory) {
+	t.Parallel()
 
-		s := newStorage(t, t.TempDir())
-		_, err := s.Manifest(context.Background(), "foo", "bar", "baz")
-		require.Error(t, err)
-	})
+	tests := []struct {
+		// error is the expected error, if any.
+		error error
+		// extension contains the expected manifest.
+		extension testutil.Extension
+		// name is the name of the test.
+		name string
+		// version is the version to expect in the manifest.  Defaults to the
+		// extension's latest version.
+		version string
+	}{
+		{
+			name:      "OK",
+			extension: testutil.Extensions[0],
+		},
+		{
+			name:      "MissingVersion",
+			error:     fs.ErrNotExist,
+			extension: testutil.Extensions[0],
+			version:   "some-nonexistent-version",
+		},
+		{
+			name:      "MissingExtension",
+			error:     fs.ErrNotExist,
+			extension: testutil.Extensions[1],
+		},
+		{
+			name:      "MissingPublisher",
+			error:     fs.ErrNotExist,
+			extension: testutil.Extensions[2],
+		},
+		{
+			name:      "ParseError",
+			error:     io.EOF,
+			extension: testutil.Extensions[3],
+		},
+	}
+
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	manifestBytes := testutil.ConvertExtensionToManifestBytes(t, ext, ext.LatestVersion)
+	f.write(manifestBytes, ext.Publisher, ext.Name, ext.LatestVersion, "extension.vsixmanifest")
+
+	ext = testutil.Extensions[3]
+	f.write([]byte("invalid"), ext.Publisher, ext.Name, ext.LatestVersion, "extension.vsixmanifest")
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			version := test.version
+			if version == "" {
+				version = test.extension.LatestVersion
+			}
+			manifest, err := f.storage.Manifest(context.Background(), test.extension.Publisher, test.extension.Name, version)
+			if test.error != nil {
+				require.Error(t, err)
+				require.True(t, errors.Is(err, test.error))
+			} else {
+				expected := testutil.ConvertExtensionToManifest(testutil.Extensions[0], version)
+				// The storage interface should add the extension asset when it reads the
+				// manifest since it is not on the actual manifest on disk.
+				expected.Assets.Asset = append(expected.Assets.Asset, storage.VSIXAsset{
+					Type:        storage.VSIXAssetType,
+					Path:        fmt.Sprintf("%s.%s-%s.vsix", test.extension.Publisher, test.extension.Name, version),
+					Addressable: "true",
+				})
+				require.NoError(t, err)
+				require.Equal(t, expected, manifest)
+			}
+		})
+	}
 }
 
 type extension struct {
@@ -162,74 +286,82 @@ type extension struct {
 	versions []string
 }
 
-func TestWalkExtensions(t *testing.T) {
+func testWalkExtensions(t *testing.T, factory storageFactory) {
 	t.Parallel()
 
-	expected := []extension{}
-	extdir := t.TempDir()
-	for _, ext := range testutil.Extensions {
-		var latestManifest *storage.VSIXManifest
-		for _, version := range ext.Versions {
-			manifest := testutil.AddExtension(t, ext, extdir, version)
-			if ext.LatestVersion == version {
-				latestManifest = manifest
-			}
-		}
-
-		// The versions should be sorted when walking.
-		versions := make([]string, len(ext.Versions))
-		copied := copy(versions, ext.Versions)
-		require.Equal(t, len(ext.Versions), copied)
-		sort.Sort(sort.Reverse(semver.ByVersion(versions)))
-
-		expected = append(expected, extension{
-			manifest: latestManifest,
-			versions: versions,
-		})
+	tests := []struct {
+		// error is the expected error, if any.
+		error string
+		// extensions contains the expected extensions
+		extensions []testutil.Extension
+		// name is then ame of the test
+		name string
+		// run is an optional walk callback.
+		run func() error
+	}{
+		{
+			name:       "OK",
+			extensions: testutil.Extensions,
+		},
+		{
+			name: "NoExtensions",
+		},
+		{
+			name:       "PropagateError",
+			error:      "propagate",
+			extensions: []testutil.Extension{testutil.Extensions[0]},
+			run: func() error {
+				return errors.New("propagate")
+			},
+		},
 	}
 
-	t.Run("NoExtensions", func(t *testing.T) {
-		t.Parallel()
-
-		s := newStorage(t, t.TempDir())
-		called := false
-		err := s.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
-			called = true
-			return nil
-		})
-		require.NoError(t, err)
-		require.False(t, called)
-	})
-
-	t.Run("PropagateError", func(t *testing.T) {
-		t.Parallel()
-
-		s := newStorage(t, extdir)
-		ran := 0
-		expected := errors.New("error")
-		err := s.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
-			ran++
-			return expected
-		})
-		require.Equal(t, expected, err)
-		require.Equal(t, 1, ran)
-	})
-
-	t.Run("OK", func(t *testing.T) {
-		t.Parallel()
-
-		got := []extension{}
-		s := newStorage(t, extdir)
-		err := s.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
-			got = append(got, extension{
-				manifest: manifest,
-				versions: versions,
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			f := factory(t)
+			expected := []extension{}
+			for _, ext := range test.extensions {
+				versions := make([]string, len(ext.Versions))
+				copy(versions, ext.Versions)
+				sort.Sort(sort.Reverse(semver.ByVersion(versions)))
+				manifest := testutil.ConvertExtensionToManifest(ext, ext.LatestVersion)
+				// The storage interface should add the extension asset when it reads the
+				// manifest since it is not on the actual manifest on disk.
+				manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
+					Type:        storage.VSIXAssetType,
+					Path:        fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion),
+					Addressable: "true",
+				})
+				expected = append(expected, extension{
+					manifest: manifest,
+					versions: versions,
+				})
+				for _, version := range ext.Versions {
+					f.write(testutil.ConvertExtensionToManifestBytes(t, ext, version), ext.Publisher, ext.Name, version, "extension.vsixmanifest")
+				}
+			}
+			got := []extension{}
+			err := f.storage.WalkExtensions(context.Background(), func(manifest *storage.VSIXManifest, versions []string) error {
+				got = append(got, extension{
+					manifest: manifest,
+					versions: versions,
+				})
+				if test.run != nil {
+					return test.run()
+				}
+				return nil
 			})
-			return nil
+			if test.error != "" {
+				require.Error(t, err)
+				require.Regexp(t, test.error, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			require.ElementsMatch(t, expected, got)
 		})
-		require.NoError(t, err)
-		require.ElementsMatch(t, expected, got)
-	})
+	}
 }
 
 func TestReadVSIX(t *testing.T) {
@@ -555,7 +687,7 @@ func TestReadVSIXPackageJson(t *testing.T) {
 	}
 }
 
-func TestAddExtension(t *testing.T) {
+func testAddExtension(t *testing.T, factory storageFactory) {
 	t.Parallel()
 
 	tests := []struct {
@@ -566,8 +698,6 @@ func TestAddExtension(t *testing.T) {
 		extension testutil.Extension
 		// name is the name of the test.
 		name string
-		// setup is ran before the test and returns the extension directory.
-		setup func(extdir string) (string, error)
 		// skip indicates whether to skip the test since some failure modes are
 		// platform-dependent.
 		skip bool
@@ -594,31 +724,17 @@ func TestAddExtension(t *testing.T) {
 			error: "zip: not a valid zip file",
 		},
 		{
-			name:      "ExtensionDirPerms",
-			extension: testutil.Extensions[0],
-			error:     "permission denied",
-			// It does not appear possible to create a directory that is not writable
-			// on Windows?
-			skip: runtime.GOOS == "windows",
-			setup: func(extdir string) (string, error) {
-				// Disallow writing to the extension directory.
-				extdir = filepath.Join(extdir, "no-write")
-				return extdir, os.MkdirAll(extdir, 0o444)
-			},
-		},
-		{
 			name:      "CopyOverDirectory",
-			extension: testutil.Extensions[0],
+			extension: testutil.Extensions[3],
 			error:     "is a directory",
-			setup: func(extdir string) (string, error) {
-				// Put a directory in the way of the vsix.
-				ext := testutil.Extensions[0]
-				vsixName := fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion)
-				vsixPath := filepath.Join(extdir, ext.Publisher, ext.Name, ext.LatestVersion, vsixName)
-				return extdir, os.MkdirAll(vsixPath, 0o755)
-			},
 		},
 	}
+
+	// Put a directory in the way of the vsix.
+	f := factory(t)
+	ext := testutil.Extensions[3]
+	vsixName := fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion)
+	f.write([]byte("foo"), ext.Publisher, ext.Name, ext.LatestVersion, vsixName, "foo")
 
 	for _, test := range tests {
 		test := test
@@ -627,39 +743,30 @@ func TestAddExtension(t *testing.T) {
 			if test.skip {
 				t.Skip()
 			}
-			var err error
-			extdir := t.TempDir()
-			if test.setup != nil {
-				extdir, err = test.setup(extdir)
-				require.NoError(t, err)
-			}
-			s := newStorage(t, extdir)
-			manifest := &storage.VSIXManifest{}
+			expected := &storage.VSIXManifest{}
 			vsix := test.vsix
 			if vsix == nil {
-				manifest = testutil.ConvertExtensionToManifest(test.extension, test.extension.LatestVersion)
-				vsix = testutil.CreateVSIXFromManifest(t, manifest)
+				expected = testutil.ConvertExtensionToManifest(test.extension, test.extension.LatestVersion)
+				vsix = testutil.CreateVSIXFromManifest(t, expected)
 			}
-			location, err := s.AddExtension(context.Background(), manifest, vsix)
+			location, err := f.storage.AddExtension(context.Background(), expected, vsix)
 			if test.error != "" {
 				require.Error(t, err)
 				require.Regexp(t, test.error, err.Error())
 			} else {
-				expected := filepath.Join(extdir, test.extension.Publisher, test.extension.Name, test.extension.LatestVersion)
-				require.Equal(t, expected, location)
-
-				_, err := os.Stat(expected)
 				require.NoError(t, err)
-
-				vsixName := fmt.Sprintf("%s.%s-%s.vsix", test.extension.Publisher, test.extension.Name, test.extension.LatestVersion)
-				_, err = os.Stat(filepath.Join(expected, vsixName))
-				require.NoError(t, err)
+				// Should make mention of the extension path.
+				require.Contains(t, location, test.extension.Publisher)
+				require.Contains(t, location, test.extension.Name)
+				require.Contains(t, location, test.extension.LatestVersion)
+				// There should be a manifest now.
+				require.True(t, f.exists(test.extension.Publisher, test.extension.Name, test.extension.LatestVersion, "extension.vsixmanifest"))
 			}
 		})
 	}
 }
 
-func TestRemoveExtension(t *testing.T) {
+func testRemoveExtension(t *testing.T, factory storageFactory) {
 	t.Parallel()
 
 	tests := []struct {
@@ -676,27 +783,27 @@ func TestRemoveExtension(t *testing.T) {
 		{
 			name:      "OK",
 			extension: testutil.Extensions[0],
-			version:   "a",
+			version:   testutil.Extensions[0].LatestVersion,
 		},
 		{
 			name:      "NoVersionMatch",
 			error:     os.ErrNotExist,
 			extension: testutil.Extensions[0],
-			version:   "d",
+			version:   "does-not-exist",
 		},
 		{
 			name:  "NoPublisherMatch",
 			error: os.ErrNotExist,
 			// [3]'s publisher does not exist.
 			extension: testutil.Extensions[3],
-			version:   "a",
+			version:   testutil.Extensions[3].LatestVersion,
 		},
 		{
 			name:  "NoNameMatch",
 			error: os.ErrNotExist,
 			// [1] shares a publisher with [0] but the extension does not exist.
 			extension: testutil.Extensions[1],
-			version:   "a",
+			version:   testutil.Extensions[1].LatestVersion,
 		},
 		{
 			name:      "All",
@@ -710,50 +817,39 @@ func TestRemoveExtension(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			extdir := t.TempDir()
-			ext := testutil.Extensions[0]
-			testutil.AddExtension(t, ext, extdir, "a")
-			testutil.AddExtension(t, ext, extdir, "b")
-			testutil.AddExtension(t, ext, extdir, "c")
+			f := factory(t)
+			for _, ext := range []testutil.Extension{testutil.Extensions[0], testutil.Extensions[2]} {
+				for _, version := range ext.Versions {
+					f.write(testutil.ConvertExtensionToManifestBytes(t, ext, version), ext.Publisher, ext.Name, version, "extension.vsixmanifest")
+				}
+			}
 
-			ext = testutil.Extensions[2]
-			testutil.AddExtension(t, ext, extdir, "a")
-			testutil.AddExtension(t, ext, extdir, "b")
-			testutil.AddExtension(t, ext, extdir, "c")
-
-			s := newStorage(t, extdir)
-			err := s.RemoveExtension(context.Background(), test.extension.Publisher, test.extension.Name, test.version)
+			err := f.storage.RemoveExtension(context.Background(), test.extension.Publisher, test.extension.Name, test.version)
 			if test.error != nil {
 				require.Error(t, err)
 				require.True(t, errors.Is(err, test.error))
 			} else {
 				require.NoError(t, err)
-				dir := filepath.Join(extdir, test.extension.Publisher, test.extension.Name)
 				// If a version was specified the parent extension directory should
 				// still exist otherwise the whole thing should have been removed.
 				if test.version != "" {
-					_, err := os.Stat(dir)
-					require.NoError(t, err)
-					dir = filepath.Join(dir, test.version)
+					require.True(t, f.exists(test.extension.Publisher, test.extension.Name))
+					require.False(t, f.exists(test.extension.Publisher, test.extension.Name, test.version))
+				} else {
+					require.False(t, f.exists(test.extension.Publisher, test.extension.Name))
 				}
-				_, err := os.Stat(dir)
-				require.Error(t, err)
 			}
 		})
 	}
 }
 
-func TestVersions(t *testing.T) {
+func testVersions(t *testing.T, factory storageFactory) {
 	t.Parallel()
 
 	tests := []struct {
 		// error is the expected error type.
 		error error
-		// expected contains the expected versions.  It is not checked if an error
-		// is expected.
-		expected []string
-		// extension is the extension to get versions.  testutil.Extensions[0]
-		// will be added with versions a, b, and c before each test.
+		// extension is the extension with the expected versions.
 		extension testutil.Extension
 		// name is the name of the test.
 		name string
@@ -761,7 +857,6 @@ func TestVersions(t *testing.T) {
 		{
 			name:      "OK",
 			extension: testutil.Extensions[0],
-			expected:  []string{"c", "b", "a"},
 		},
 		{
 			name: "NoExtension",
@@ -777,26 +872,27 @@ func TestVersions(t *testing.T) {
 		},
 	}
 
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	for _, version := range ext.Versions {
+		f.write([]byte("stub"), ext.Publisher, ext.Name, version, "extension.vsixmanifest")
+	}
+
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			var err error
-			extdir := t.TempDir()
-			ext := testutil.Extensions[0]
-			testutil.AddExtension(t, ext, extdir, "a")
-			testutil.AddExtension(t, ext, extdir, "b")
-			testutil.AddExtension(t, ext, extdir, "c")
-
-			s := newStorage(t, extdir)
-			got, err := s.Versions(context.Background(), test.extension.Publisher, test.extension.Name)
+			got, err := f.storage.Versions(context.Background(), test.extension.Publisher, test.extension.Name)
 			if test.error != nil {
 				require.Error(t, err)
 				require.True(t, errors.Is(err, test.error))
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, test.expected, got)
+				versions := make([]string, len(test.extension.Versions))
+				copy(versions, test.extension.Versions)
+				sort.Sort(sort.Reverse(semver.ByVersion(versions)))
+				require.Equal(t, versions, got)
 			}
 		})
 	}

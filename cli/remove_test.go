@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,7 +47,7 @@ func TestRemove(t *testing.T) {
 		{
 			name:      "RemoveOne",
 			extension: testutil.Extensions[0],
-			version:   "a",
+			version:   testutil.Extensions[0].LatestVersion,
 		},
 		{
 			name:      "All",
@@ -67,19 +69,19 @@ func TestRemove(t *testing.T) {
 			error:     "cannot specify both",
 			extension: testutil.Extensions[0],
 			all:       true,
-			version:   "a",
+			version:   testutil.Extensions[0].LatestVersion,
 		},
 		{
 			name:      "NoVersion",
 			error:     "does not exist",
 			extension: testutil.Extensions[0],
-			version:   "d",
+			version:   "does-not-exist",
 		},
 		{
 			name:      "NoVersions",
 			error:     "does not exist",
 			extension: testutil.Extensions[1],
-			version:   "a",
+			version:   testutil.Extensions[1].LatestVersion,
 		},
 		{
 			name:      "AllNoVersions",
@@ -96,9 +98,13 @@ func TestRemove(t *testing.T) {
 
 			extdir := t.TempDir()
 			ext := testutil.Extensions[0]
-			testutil.AddExtension(t, ext, extdir, "a")
-			testutil.AddExtension(t, ext, extdir, "b")
-			testutil.AddExtension(t, ext, extdir, "c")
+			for _, version := range ext.Versions {
+				manifestPath := filepath.Join(extdir, ext.Publisher, ext.Name, version, "extension.vsixmanifest")
+				err := os.MkdirAll(filepath.Dir(manifestPath), 0o755)
+				require.NoError(t, err)
+				err = os.WriteFile(manifestPath, testutil.ConvertExtensionToManifestBytes(t, ext, version), 0o644)
+				require.NoError(t, err)
+			}
 
 			id := fmt.Sprintf("%s.%s", test.extension.Publisher, test.extension.Name)
 			if test.version != "" {
@@ -123,10 +129,10 @@ func TestRemove(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				if test.all {
-					require.Contains(t, output, "Removed 3 versions")
-					require.Contains(t, output, "  - a")
-					require.Contains(t, output, "  - b")
-					require.Contains(t, output, "  - c")
+					require.Contains(t, output, fmt.Sprintf("Removed %d versions", len(test.extension.Versions)))
+					for _, version := range test.extension.Versions {
+						require.Contains(t, output, fmt.Sprintf("  - %s", version))
+					}
 				} else {
 					require.Contains(t, output, fmt.Sprintf("Removed %s", test.version))
 				}
