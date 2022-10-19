@@ -152,6 +152,9 @@ the policy in code-server's source.
 When you make a change that affects people deploying the marketplace please
 update the changelog as part of your PR.
 
+You can use `make gen` to generate a mock `extensions` directory for testing and
+`make upload` to upload them to an Artifactory repository.
+
 ### Tests
 
 To run the tests:

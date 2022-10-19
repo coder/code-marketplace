@@ -17,6 +17,14 @@ coverage:
 	go tool cover -func=coverage
 .PHONY: coverage
 
+gen:
+	bash ./fixtures/generate.bash
+.PHONY: gen
+
+upload:
+	bash ./fixtures/upload.bash
+.PHONY: gen
+
 TAG=$(shell git describe --always)
 
 build:
