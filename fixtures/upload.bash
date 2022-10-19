@@ -4,4 +4,4 @@
 set -Eeuo pipefail
 
 cd ./extensions
-find . -type f -exec curl -H "X-JFrog-Art-Api:$ARTIFACTORY_TOKEN" -T '{}' "$ARTIFACTORY_URI/$ARTIFACTORY_REPO/"'{}' \;
+find . -type f -exec curl -H "Authorization: Bearer $ARTIFACTORY_TOKEN" -T '{}' "$ARTIFACTORY_URI/$ARTIFACTORY_REPO/"'{}' \;

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -176,7 +177,7 @@ func artifactoryFactory(t *testing.T) testStorage {
 			t.Log("Failed to clean up", err)
 			return
 		}
-		req.Header.Add("X-JFrog-Art-Api", token)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Log("Failed to clean up", err)
@@ -192,7 +193,7 @@ func artifactoryFactory(t *testing.T) testStorage {
 		write: func(content []byte, elem ...string) {
 			req, err := http.NewRequest(http.MethodPut, uri+path.Join(repo, path.Join(elem...)), bytes.NewReader(content))
 			require.NoError(t, err)
-			req.Header.Add("X-JFrog-Art-Api", token)
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 			res, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
 			defer res.Body.Close()
@@ -200,7 +201,7 @@ func artifactoryFactory(t *testing.T) testStorage {
 		exists: func(elem ...string) bool {
 			req, err := http.NewRequest(http.MethodGet, uri+path.Join(repo, path.Join(elem...)), nil)
 			require.NoError(t, err)
-			req.Header.Add("X-JFrog-Art-Api", token)
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
 				return false

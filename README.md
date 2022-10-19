@@ -58,6 +58,9 @@ export ARTIFACTORY_TOKEN="my-token"
 ./code-marketplace [command] --artifactory http://artifactory.server/artifactory --repo extensions
 ```
 
+The token will be used as the `Authorization` header with the value `Bearer
+<TOKEN>`.
+
 ### Exposing the marketplace
 
 The marketplace must be put behind TLS otherwise code-server will reject

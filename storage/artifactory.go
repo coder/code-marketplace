@@ -138,7 +138,7 @@ func (s *Artifactory) request(ctx context.Context, method, endpoint string, r io
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	req.Header.Add("X-JFrog-Art-Api", s.token)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", s.token))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
