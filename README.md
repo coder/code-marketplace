@@ -70,8 +70,8 @@ like Cloudflare.
 
 When hosting the marketplace behind a reverse proxy set either the `Forwarded`
 header or both the `X-Forwarded-Host` and `X-Forwarded-Proto` headers. These
-headers are used to generate absolute URIs to extension assets in API responses.
-One way to test this is to make a query and check one of the URIs in the
+headers are used to generate absolute URLs to extension assets in API responses.
+One way to test this is to make a query and check one of the URLs in the
 response:
 
 ```console
@@ -89,11 +89,11 @@ receive requests.
 
 ## Adding extensions
 
-Extensions can be added to the marketplace by file or URL. The extensions
-directory does not need to be created beforehand.
+Extensions can be added to the marketplace by file, directory, or web URL.
 
 ```console
 ./code-marketplace add extension.vsix [flags]
+./code-marketplace add extension-vsixs/ [flags]
 ./code-marketplace add https://domain.tld/extension.vsix [flags]
 ```
 

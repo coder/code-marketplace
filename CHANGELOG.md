@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Artifactory integration.
+- Bulk add from a directory.  This only works when adding from a local directory
+  and not from web URLs.
 
 ## [1.1.0](https://github.com/coder/code-marketplace/releases/tag/v1.1.0) - 2022-10-03
 
