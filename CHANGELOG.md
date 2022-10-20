@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Artifactory integration.
+- Artifactory integration. Set the ARTIFACTORY_TOKEN environment variable and
+  pass --artifactory and --repo (instead of --extensions-dir) to use.
+- Stat endpoints. This is just to prevent noisy 404s from being logged; the
+  endpoints do nothing since stats are not yet supported.
 - Bulk add from a directory.  This only works when adding from a local directory
   and not from web URLs.
 
