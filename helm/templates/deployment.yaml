@@ -25,10 +25,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "code-marketplace.serviceAccountName" . }}
+      {{- if not .Values.persistence.artifactory.enabled }}
       volumes:
         - name: extensions
           persistentVolumeClaim:
             claimName: {{ include "code-marketplace.fullname" . }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -37,6 +39,14 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.persistence.artifactory.enabled }}
+          env:
+            - name: "ARTIFACTORY_TOKEN"
+              valueFrom:
+                secretKeyRef:
+                  name: artifactory
+                  key: token
+          {{- end }}
           ports:
             - name: http
               containerPort: 80
@@ -44,11 +54,20 @@ spec:
           args:
             - --address
             - 0.0.0.0:80
+            {{- if .Values.persistence.artifactory.enabled }}
+            - --artifactory
+            - {{ .Values.persistence.artifactory.uri }}
+            - --repo
+            - {{ .Values.persistence.artifactory.repo }}
+            {{- else }}
             - --extensions-dir
             - /extensions
+            {{- end }}
+          {{- if not .Values.persistence.artifactory.enabled }}
           volumeMounts:
             - name: extensions
               mountPath: /extensions
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

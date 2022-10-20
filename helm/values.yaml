@@ -84,4 +84,11 @@ tolerations: []
 affinity: {}
 
 persistence:
+  artifactory:
+    # Use Artifactory for extensions instead of a persistent volume. Make sure
+    # to create an `artifactory` secret with a `token` key.
+    enabled: false
+    uri: https://artifactory.server/artifactory
+    repo: extensions
+  # Size is ignored when using Artifactory.
   size: 100Gi
