@@ -190,7 +190,6 @@ make test
 
 ## Planned work
 
-- Bulk add.
 - Bulk add from one Artifactory repository to another (or to itself).
 - Optional database to speed up queries.
 - Progress indicators when adding/removing extensions.
