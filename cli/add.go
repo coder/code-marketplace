@@ -56,14 +56,19 @@ func add() *cobra.Command {
 				return err
 			}
 
-			stat, err := os.Stat(args[0])
-			if err != nil {
-				return err
+			// The source might be a local directory with extensions.
+			isDir := false
+			if !strings.HasPrefix(args[0], "http://") && !strings.HasPrefix(args[0], "https://") {
+				stat, err := os.Stat(args[0])
+				if err != nil {
+					return err
+				}
+				isDir = stat.IsDir()
 			}
 
 			var summary []string
 			var failed []string
-			if stat.IsDir() {
+			if isDir {
 				files, err := os.ReadDir(args[0])
 				if err != nil {
 					return err

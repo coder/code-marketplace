@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [1.2.1](https://github.com/coder/code-marketplace/releases/tag/v1.2.1) - 2022-10-31
+
+### Fixed
+
+- Adding extensions from a URL. This broke in 1.2.0 with the addition of bulk
+  adding.
+
 ## [1.2.0](https://github.com/coder/code-marketplace/releases/tag/v1.2.0) - 2022-10-20
 
 ### Added
