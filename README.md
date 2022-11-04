@@ -2,7 +2,13 @@
 
 The Code Extension Marketplace is an open-source alternative to the VS Code
 Marketplace for use in editors like
-[code-server](https://github.com/coder/code-server).
+[code-server](https://github.com/coder/code-server) or [VSCodium](https://github.com/VSCodium/vscodium). 
+
+It is maintained by [Coder](https://www.coder.com) and is used by our
+enterprise customers in regulated and security-conscious industries like
+banking, asset management, military, and intelligence where they deploy
+Coder in an air-gapped network. Accessing an Internet-hosted marketplace
+is not allowed.
 
 This marketplace reads extensions from file storage and provides an API for
 editors to consume. It does not have a frontend or any mechanisms for extension
