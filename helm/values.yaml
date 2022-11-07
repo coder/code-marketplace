@@ -84,6 +84,7 @@ tolerations: []
 affinity: {}
 
 persistence:
+  storageClass: standard
   artifactory:
     # Use Artifactory for extensions instead of a persistent volume. Make sure
     # to create an `artifactory` secret with a `token` key.
