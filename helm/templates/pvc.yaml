@@ -9,5 +9,5 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.size | quote }}
-  storageClassName: standard
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
 {{- end }}
