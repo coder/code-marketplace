@@ -7,12 +7,12 @@ import (
 
 func Root() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "marketplace",
+		Use:           "code-marketplace",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Long:          "Code extension marketplace",
 		Example: strings.Join([]string{
-			"  marketplace server --extensions-dir ./extensions",
+			"  code-marketplace server --extensions-dir ./extensions",
 		}, "\n"),
 	}
 
