@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - "**.go"
+      - "go.sum"
       - ".github/workflows/lint.yaml"
   pull_request:
     paths:
       - "**.go"
+      - "go.sum"
       - ".github/workflows/lint.yaml"
   workflow_dispatch:
 

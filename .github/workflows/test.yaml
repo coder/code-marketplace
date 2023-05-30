@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - "**.go"
+      - "go.sum"
       - ".github/workflows/test.yaml"
   pull_request:
     paths:
       - "**.go"
+      - "go.sum"
       - ".github/workflows/test.yaml"
   workflow_dispatch:
 
