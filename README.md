@@ -2,13 +2,12 @@
 
 The Code Extension Marketplace is an open-source alternative to the VS Code
 Marketplace for use in editors like
-[code-server](https://github.com/coder/code-server) or [VSCodium](https://github.com/VSCodium/vscodium). 
+[code-server](https://github.com/coder/code-server) or [VSCodium](https://github.com/VSCodium/vscodium).
 
-It is maintained by [Coder](https://www.coder.com) and is used by our
-enterprise customers in regulated and security-conscious industries like
-banking, asset management, military, and intelligence where they deploy
-Coder in an air-gapped network. Accessing an Internet-hosted marketplace
-is not allowed.
+It is maintained by [Coder](https://www.coder.com) and is used by our enterprise
+customers in regulated and security-conscious industries like banking, asset
+management, military, and intelligence where they deploy Coder in an air-gapped
+network and accessing an internet-hosted marketplace is not allowed.
 
 This marketplace reads extensions from file storage and provides an API for
 editors to consume. It does not have a frontend or any mechanisms for extension
@@ -64,7 +63,7 @@ export ARTIFACTORY_TOKEN="my-token"
 ./code-marketplace [command] --artifactory http://artifactory.server/artifactory --repo extensions
 ```
 
-The token will be used as the `Authorization` header with the value `Bearer
+The token will be used in the `Authorization` header with the value `Bearer
 <TOKEN>`.
 
 ### Exposing the marketplace
@@ -122,14 +121,13 @@ For example to add the Python extension from Open VSX:
 Or the Vim extension from GitHub:
 
 ```console
-./code-marketplace add
-https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix [flags]
+./code-marketplace add https://github.com/VSCodeVim/Vim/releases/download/v1.24.1/vim-1.24.1.vsix [flags]
 ```
 
 ## Removing extensions
 
-Extensions can be removed from the marketplace by ID and version (or use `--all`
-to remove all versions).
+Extensions can be removed from the marketplace by ID and version or `--all` to
+remove all versions.
 
 ```console
 ./code-marketplace remove ms-python.python-2022.14.0 [flags]
@@ -137,6 +135,22 @@ to remove all versions).
 ```
 
 ## Usage in code-server
+
+You can point code-server to your marketplace by setting the
+`EXTENSIONS_GALLERY` environment variable.
+
+The value of this variable is a JSON blob that specifies the service URL, item
+URL, and resource URL template.
+
+- `serviceURL`: specifies the location of the API (`https://<domain>/api`).
+- `itemURL`: the frontend for extensions which is currently just a mostly blank
+  page that says "not supported" (`https://<domain>/item`)
+- `resourceURLTemplate`: used to download web extensions like Vim; code-server
+  itself will replace the `{publisher}`, `{name}`, `{version}`, and `{path}`
+  template variables so use them verbatim
+  (`https://<domain>/files/{publisher}/{name}/{version}/{path}`).
+
+For example (replace `<domain>` with your marketplace's domain):
 
 ```console
 export EXTENSIONS_GALLERY='{"serviceUrl":"https://<domain>/api", "itemUrl":"https://<domain>/item", "resourceUrlTemplate": "https://<domain>/files/{publisher}/{name}/{version}/{path}"}'
