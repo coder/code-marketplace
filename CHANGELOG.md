@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [1.2.2](https://github.com/coder/code-marketplace/releases/tag/v1.2.2) - 2023-05-30
+
+### Changed
+
+- Help/usage outputs the binary name as `code-marketplace` instead of
+  `marketplace` to be consistent with documentation.
+- Binary is symlinked into /usr/local/bin in the Docker image so it can be
+  invoked as simply `code-marketplace`.
+
 ## [1.2.1](https://github.com/coder/code-marketplace/releases/tag/v1.2.1) - 2022-10-31
 
 ### Fixed
