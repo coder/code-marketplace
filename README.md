@@ -160,6 +160,13 @@ code-server
 If code-server reports content security policy errors ensure that the
 marketplace is running behind an https URL.
 
+## Usage in VS Code & VSCodium
+
+Although not officially supported, you can follow the examples below to start using code-marketplace with VS Code and VSCodium:
+
+- [VS Code](https://github.com/eclipse/openvsx/wiki/Using-Open-VSX-in-VS-Code)
+- [VSCodium](https://github.com/VSCodium/vscodium/blob/master/DOCS.md#how-to-use-the-vs-code-marketplace)
+
 ## Development
 
 ```console
