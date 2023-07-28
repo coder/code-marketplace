@@ -29,7 +29,7 @@ func remove() *cobra.Command {
 		Use:   "remove <id>",
 		Short: "Remove an extension from the marketplace",
 		Example: strings.Join([]string{
-			"  marketplace remove publisher.extension-1.0.0 --extensions-dir ./extensions",
+			"  marketplace remove publisher.extension@1.0.0 --extensions-dir ./extensions",
 			"  marketplace remove publisher.extension --all --artifactory http://artifactory.server/artifactory --repo extensions",
 		}, "\n"),
 		Args: cobra.ExactArgs(1),
@@ -78,7 +78,7 @@ func remove() *cobra.Command {
 				return xerrors.Errorf("%s.%s has no versions to delete", publisher, name)
 			} else if version == "" && !all {
 				return xerrors.Errorf(
-					"use %s-<version> to target a specific version or pass --all to delete %s of %s",
+					"use %s@<version> to target a specific version or pass --all to delete %s of %s",
 					id,
 					util.Plural(versionCount, "version", ""),
 					id,
@@ -94,7 +94,7 @@ func remove() *cobra.Command {
 				removedCount := len(allVersions)
 				summary = append(summary, fmt.Sprintf("Removed %s", util.Plural(removedCount, "version", "")))
 				for _, version := range allVersions {
-					summary = append(summary, fmt.Sprintf("  - %s", version))
+					summary = append(summary, fmt.Sprintf("  @ %s", version))
 				}
 			} else {
 				summary = append(summary, fmt.Sprintf("Removed %s", version))

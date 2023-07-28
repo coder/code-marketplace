@@ -130,7 +130,7 @@ Extensions can be removed from the marketplace by ID and version or `--all` to
 remove all versions.
 
 ```console
-./code-marketplace remove ms-python.python-2022.14.0 [flags]
+./code-marketplace remove ms-python.python@2022.14.0 [flags]
 ./code-marketplace remove ms-python.python --all [flags]
 ```
 

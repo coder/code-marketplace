@@ -230,7 +230,7 @@ func testManifest(t *testing.T, factory storageFactory) {
 			name:      "MissingVersion",
 			error:     fs.ErrNotExist,
 			extension: testutil.Extensions[0],
-			version:   "some-nonexistent-version",
+			version:   "some-nonexistent@version",
 		},
 		{
 			name:      "MissingExtension",
@@ -275,7 +275,7 @@ func testManifest(t *testing.T, factory storageFactory) {
 				// manifest since it is not on the actual manifest on disk.
 				expected.Assets.Asset = append(expected.Assets.Asset, storage.VSIXAsset{
 					Type:        storage.VSIXAssetType,
-					Path:        fmt.Sprintf("%s.%s-%s.vsix", test.extension.Publisher, test.extension.Name, version),
+					Path:        fmt.Sprintf("%s.%s@%s.vsix", test.extension.Publisher, test.extension.Name, version),
 					Addressable: "true",
 				})
 				require.NoError(t, err)
@@ -335,7 +335,7 @@ func testWalkExtensions(t *testing.T, factory storageFactory) {
 				// manifest since it is not on the actual manifest on disk.
 				manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
 					Type:        storage.VSIXAssetType,
-					Path:        fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion),
+					Path:        fmt.Sprintf("%s.%s@%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion),
 					Addressable: "true",
 				})
 				expected = append(expected, extension{
@@ -734,7 +734,7 @@ func testAddExtension(t *testing.T, factory storageFactory) {
 	// Put a directory in the way of the vsix.
 	f := factory(t)
 	ext := testutil.Extensions[3]
-	vsixName := fmt.Sprintf("%s.%s-%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion)
+	vsixName := fmt.Sprintf("%s.%s@%s.vsix", ext.Publisher, ext.Name, ext.LatestVersion)
 	f.write([]byte("foo"), ext.Publisher, ext.Name, ext.LatestVersion, vsixName, "foo")
 
 	for _, test := range tests {
@@ -909,7 +909,7 @@ func TestExtensionID(t *testing.T) {
 	}{
 		{
 			name:     "OK",
-			expected: "foo.bar-test",
+			expected: "foo.bar@test",
 			manifest: &storage.VSIXManifest{
 				Metadata: storage.VSIXMetadata{
 					Identity: storage.VSIXIdentity{
@@ -948,12 +948,12 @@ func TestParseExtensionID(t *testing.T) {
 		{
 			name:     "OK",
 			expected: []string{"foo", "bar", "test"},
-			id:       "foo.bar-test",
+			id:       "foo.bar@test",
 		},
 		{
 			name:     "VersionWithDots",
 			expected: []string{"foo", "bar", "test.test"},
-			id:       "foo.bar-test.test",
+			id:       "foo.bar@test.test",
 		},
 		{
 			name:  "EmptyID",
@@ -963,12 +963,12 @@ func TestParseExtensionID(t *testing.T) {
 		{
 			name:  "MissingPublisher",
 			error: true,
-			id:    ".qux-bar",
+			id:    ".qux@bar",
 		},
 		{
 			name:  "MissingExtension",
 			error: true,
-			id:    "foo.-baz",
+			id:    "foo.@baz",
 		},
 		{
 			name:  "MissingExtensionAndVersion",
@@ -983,7 +983,7 @@ func TestParseExtensionID(t *testing.T) {
 		{
 			name:  "InvalidID",
 			error: true,
-			id:    "publisher-version",
+			id:    "publisher@version",
 		},
 	}
 

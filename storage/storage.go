@@ -250,16 +250,16 @@ func ExtensionIDFromManifest(manifest *VSIXManifest) string {
 
 // ExtensionID returns the full ID of an extension.
 func ExtensionID(publisher, name, version string) string {
-	return fmt.Sprintf("%s.%s-%s", publisher, name, version)
+	return fmt.Sprintf("%s.%s@%s", publisher, name, version)
 }
 
 // ParseExtensionID parses an extension ID into its separate parts: publisher,
 // name, and version (version may be blank).
 func ParseExtensionID(id string) (string, string, string, error) {
-	re := regexp.MustCompile(`^([^.]+)\.([^-]+)-?(.*)$`)
+	re := regexp.MustCompile(`^([^.]+)\.([^@]+)@?(.*)$`)
 	match := re.FindAllStringSubmatch(id, -1)
 	if match == nil {
-		return "", "", "", xerrors.Errorf("\"%s\" does not match <publisher>.<name> or <publisher>.<name>-<version>", id)
+		return "", "", "", xerrors.Errorf("\"%s\" does not match <publisher>.<name> or <publisher>.<name>@<version>", id)
 	}
 	return match[0][1], match[0][2], match[0][3], nil
 }
