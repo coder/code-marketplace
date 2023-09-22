@@ -94,7 +94,7 @@ func remove() *cobra.Command {
 				removedCount := len(allVersions)
 				summary = append(summary, fmt.Sprintf("Removed %s", util.Plural(removedCount, "version", "")))
 				for _, version := range allVersions {
-					summary = append(summary, fmt.Sprintf("  @ %s", version))
+					summary = append(summary, fmt.Sprintf("  - %s", version))
 				}
 			} else {
 				summary = append(summary, fmt.Sprintf("Removed %s", version))
