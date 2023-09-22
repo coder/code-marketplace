@@ -108,7 +108,7 @@ func TestRemove(t *testing.T) {
 
 			id := fmt.Sprintf("%s.%s", test.extension.Publisher, test.extension.Name)
 			if test.version != "" {
-				id = fmt.Sprintf("%s-%s", id, test.version)
+				id = fmt.Sprintf("%s@%s", id, test.version)
 			}
 
 			cmd := cli.Root()

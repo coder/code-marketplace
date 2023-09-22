@@ -105,7 +105,7 @@ EOF
       cat<<EOF > "$dest/extension/extension.js"
 const vscode = require("vscode");
 function activate(context) {
-  vscode.window.showInformationMessage("mock extension $publisher.$name-$version loaded");
+  vscode.window.showInformationMessage("mock extension $publisher.$name@$version loaded");
 }
 exports.activate = activate;
 EOF
@@ -121,8 +121,8 @@ mock changelog
 EOF
       cp "$dir/icon.png" "$dest/extension/images/icon.png"
       pushd "$dest" >/dev/null
-      rm "$publisher.$name-$version.vsix"
-      zip -r "$publisher.$name-$version.vsix" * -q
+      rm "$publisher.$name@$version.vsix"
+      zip -r "$publisher.$name@$version.vsix" * -q
       popd >/dev/null
     done < "$dir/versions"
   done < "$dir/names"
