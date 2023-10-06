@@ -199,6 +199,24 @@ func TestAPI(t *testing.T) {
 			Response: "/files/publisher/extension/version/foo",
 		},
 		{
+			Name:     "AssetOKPlatform",
+			Path:     "/assets/publisher/extension/version@linux-x64/type",
+			Status:   http.StatusMovedPermanently,
+			Response: "/files/publisher/extension/version@linux-x64/foo",
+		},
+		{
+			Name:     "AssetOKPlatformQuery",
+			Path:     "/assets/publisher/extension/version/type?targetPlatform=linux-x64",
+			Status:   http.StatusMovedPermanently,
+			Response: "/files/publisher/extension/version@linux-x64/foo",
+		},
+		{
+			Name:     "AssetOKDuplicatedPlatformQuery",
+			Path:     "/assets/publisher/extension/version@darwin-x64/type?targetPlatform=linux-x64",
+			Status:   http.StatusMovedPermanently,
+			Response: "/files/publisher/extension/version@darwin-x64/foo",
+		},
+		{
 			Name:   "DownloadNotExist",
 			Path:   "/publishers/notexist/vsextensions/extension/version/vspackage",
 			Status: http.StatusNotFound,

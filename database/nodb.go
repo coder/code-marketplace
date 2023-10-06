@@ -40,7 +40,7 @@ func (db *NoDB) GetExtensionAssetPath(ctx context.Context, asset *Asset, baseURL
 			"files",
 			asset.Publisher,
 			asset.Extension,
-			asset.Version),
+			asset.Version.String()),
 	}).String()
 
 	for _, a := range manifest.Assets.Asset {
@@ -56,7 +56,7 @@ func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, ba
 	vscodeExts := []*noDBExtension{}
 
 	start := time.Now()
-	err := db.Storage.WalkExtensions(ctx, func(manifest *storage.VSIXManifest, versions []string) error {
+	err := db.Storage.WalkExtensions(ctx, func(manifest *storage.VSIXManifest, versions []storage.Version) error {
 		vscodeExt := convertManifestToExtension(manifest)
 		if matched, distances := getMatches(vscodeExt, filter); matched {
 			vscodeExt.versions = versions
@@ -315,15 +315,26 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 		slog.F("publisher", ext.Publisher.PublisherName),
 		slog.F("extension", ext.Name))
 
-	versionStrs := ext.versions
+	var storageVers []storage.Version
 	if flags&IncludeLatestVersionOnly != 0 {
-		versionStrs = []string{ext.versions[0]}
+		// There might be multiple platforms for this version so find all the ones
+		// that match.  Since they are sorted we can bail once one does not match.
+		latestVersion := ext.versions[0].Version
+		for _, version := range ext.versions {
+			if version.Version == latestVersion {
+				storageVers = append(storageVers, version)
+			} else {
+				break
+			}
+		}
+	} else {
+		storageVers = ext.versions
 	}
 
 	versions := []ExtVersion{}
-	for _, versionStr := range versionStrs {
-		ctx := slog.With(ctx, slog.F("version", versionStr))
-		manifest, err := db.Storage.Manifest(ctx, ext.Publisher.PublisherName, ext.Name, versionStr)
+	for _, storageVer := range storageVers {
+		ctx := slog.With(ctx, slog.F("version", storageVer))
+		manifest, err := db.Storage.Manifest(ctx, ext.Publisher.PublisherName, ext.Name, storageVer)
 		if err != nil && errors.Is(err, context.Canceled) {
 			return nil, err
 		} else if err != nil {
@@ -332,9 +343,8 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 		}
 
 		version := ExtVersion{
-			Version: versionStr,
+			Version: storageVer,
 			// LastUpdated:    time.Now(), // TODO: Use modified time?
-			TargetPlatform: manifest.Metadata.Identity.TargetPlatform,
 		}
 
 		if flags&IncludeFiles != 0 {
@@ -346,7 +356,7 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 					"/files",
 					ext.Publisher.PublisherName,
 					ext.Name,
-					versionStr),
+					version.String()),
 			}).String()
 			for _, asset := range manifest.Assets.Asset {
 				if asset.Addressable != "true" {
@@ -378,7 +388,7 @@ func (db *NoDB) getVersions(ctx context.Context, ext *noDBExtension, flags Flag,
 					"assets",
 					ext.Publisher.PublisherName,
 					ext.Name,
-					versionStr),
+					version.String()),
 			}).String()
 			version.FallbackAssetURI = version.AssetURI
 		}
@@ -394,7 +404,7 @@ type noDBExtension struct {
 	// Used internally for ranking.  Lower means more relevant.
 	distances []int `json:"-"`
 	// Used internally to avoid reading and sorting versions twice.
-	versions []string `json:"-"`
+	versions []storage.Version `json:"-"`
 }
 
 func convertManifestToExtension(manifest *storage.VSIXManifest) *noDBExtension {

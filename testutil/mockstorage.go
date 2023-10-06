@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"sort"
 
 	"github.com/coder/code-marketplace/storage"
 )
@@ -30,11 +31,13 @@ func (s *MockStorage) FileServer() http.Handler {
 	})
 }
 
-func (s *MockStorage) Manifest(ctx context.Context, publisher, name, version string) (*storage.VSIXManifest, error) {
+func (s *MockStorage) Manifest(ctx context.Context, publisher, name string, version storage.Version) (*storage.VSIXManifest, error) {
 	for _, ext := range Extensions {
 		if ext.Publisher == publisher && ext.Name == name {
 			for _, ver := range ext.Versions {
-				if ver == version {
+				// Use the string encoding to match since that is how the real storage
+				// implementations will do it too.
+				if ver.String() == version.String() {
 					return ConvertExtensionToManifest(ext, ver), nil
 				}
 			}
@@ -44,19 +47,22 @@ func (s *MockStorage) Manifest(ctx context.Context, publisher, name, version str
 	return nil, os.ErrNotExist
 }
 
-func (s *MockStorage) RemoveExtension(ctx context.Context, publisher, name, version string) error {
+func (s *MockStorage) RemoveExtension(ctx context.Context, publisher, name string, version storage.Version) error {
 	return errors.New("not implemented")
 }
 
-func (s *MockStorage) WalkExtensions(ctx context.Context, fn func(manifest *storage.VSIXManifest, versions []string) error) error {
+func (s *MockStorage) WalkExtensions(ctx context.Context, fn func(manifest *storage.VSIXManifest, versions []storage.Version) error) error {
 	for _, ext := range Extensions {
-		if err := fn(ConvertExtensionToManifest(ext, ext.Versions[0]), ext.Versions); err != nil {
+		versions := make([]storage.Version, len(ext.Versions))
+		copy(versions, ext.Versions)
+		sort.Sort(storage.ByVersion(versions))
+		if err := fn(ConvertExtensionToManifest(ext, versions[0]), versions); err != nil {
 			return nil
 		}
 	}
 	return nil
 }
 
-func (s *MockStorage) Versions(ctx context.Context, publisher, name string) ([]string, error) {
+func (s *MockStorage) Versions(ctx context.Context, publisher, name string) ([]storage.Version, error) {
 	return nil, errors.New("not implemented")
 }

@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	"golang.org/x/mod/semver"
-
 	"cdr.dev/slog"
 )
 
@@ -36,7 +34,10 @@ func NewLocalStorage(extdir string, logger slog.Logger) (*Local, error) {
 func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
-	dir := filepath.Join(s.extdir, identity.Publisher, identity.ID, identity.Version)
+	dir := filepath.Join(s.extdir, identity.Publisher, identity.ID, Version{
+		Version:        identity.Version,
+		TargetPlatform: identity.TargetPlatform,
+	}.String())
 	err := ExtractZip(vsix, func(name string, r io.Reader) error {
 		path := filepath.Join(dir, name)
 		err := os.MkdirAll(filepath.Dir(path), 0o755)
@@ -56,7 +57,7 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	}
 
 	// Copy the VSIX itself as well.
-	vsixPath := filepath.Join(dir, fmt.Sprintf("%s.vsix", ExtensionIDFromManifest(manifest)))
+	vsixPath := filepath.Join(dir, fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest)))
 	err = os.WriteFile(vsixPath, vsix, 0o644)
 	if err != nil {
 		return "", err
@@ -69,8 +70,8 @@ func (s *Local) FileServer() http.Handler {
 	return http.FileServer(http.Dir(s.extdir))
 }
 
-func (s *Local) Manifest(ctx context.Context, publisher, name, version string) (*VSIXManifest, error) {
-	reader, err := os.Open(filepath.Join(s.extdir, publisher, name, version, "extension.vsixmanifest"))
+func (s *Local) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
+	reader, err := os.Open(filepath.Join(s.extdir, publisher, name, version.String(), "extension.vsixmanifest"))
 	if err != nil {
 		return nil, err
 	}
@@ -87,15 +88,15 @@ func (s *Local) Manifest(ctx context.Context, publisher, name, version string) (
 
 	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 		Type:        VSIXAssetType,
-		Path:        fmt.Sprintf("%s.vsix", ExtensionIDFromManifest(manifest)),
+		Path:        fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest)),
 		Addressable: "true",
 	})
 
 	return manifest, nil
 }
 
-func (s *Local) RemoveExtension(ctx context.Context, publisher, name, version string) error {
-	dir := filepath.Join(s.extdir, publisher, name, version)
+func (s *Local) RemoveExtension(ctx context.Context, publisher, name string, version Version) error {
+	dir := filepath.Join(s.extdir, publisher, name, version.String())
 	// RemoveAll() will not error if the directory does not exist so check first
 	// as this function should error when removing versions that do not exist.
 	_, err := os.Stat(dir)
@@ -105,15 +106,19 @@ func (s *Local) RemoveExtension(ctx context.Context, publisher, name, version st
 	return os.RemoveAll(dir)
 }
 
-func (s *Local) Versions(ctx context.Context, publisher, name string) ([]string, error) {
+func (s *Local) Versions(ctx context.Context, publisher, name string) ([]Version, error) {
 	dir := filepath.Join(s.extdir, publisher, name)
-	versions, err := s.getDirNames(ctx, dir)
+	versionDirs, err := s.getDirNames(ctx, dir)
+	var versions []Version
+	for _, versionDir := range versionDirs {
+		versions = append(versions, VersionFromString(versionDir))
+	}
 	// Return anything we did get even if there was an error.
-	sort.Sort(sort.Reverse(semver.ByVersion(versions)))
+	sort.Sort(ByVersion(versions))
 	return versions, err
 }
 
-func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error {
+func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error {
 	publishers, err := s.getDirNames(ctx, s.extdir)
 	if err != nil {
 		s.logger.Error(ctx, "Error reading publisher", slog.Error(err))

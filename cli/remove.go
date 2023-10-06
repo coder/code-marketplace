@@ -56,13 +56,14 @@ func remove() *cobra.Command {
 				return err
 			}
 
-			id := args[0]
-			publisher, name, version, err := storage.ParseExtensionID(id)
+			targetId := args[0]
+			publisher, name, versionStr, err := storage.ParseExtensionID(targetId)
 			if err != nil {
 				return err
 			}
 
-			if version != "" && all {
+			version := storage.Version{Version: versionStr}
+			if version.Version != "" && all {
 				return xerrors.Errorf("cannot specify both --all and version %s", version)
 			}
 
@@ -72,34 +73,39 @@ func remove() *cobra.Command {
 			}
 
 			versionCount := len(allVersions)
-			if !all && version != "" && !util.Contains(allVersions, version) {
-				return xerrors.Errorf("%s does not exist", id)
-			} else if versionCount == 0 {
-				return xerrors.Errorf("%s.%s has no versions to delete", publisher, name)
-			} else if version == "" && !all {
+			if version.Version == "" && !all {
 				return xerrors.Errorf(
 					"use %s@<version> to target a specific version or pass --all to delete %s of %s",
-					id,
+					targetId,
 					util.Plural(versionCount, "version", ""),
-					id,
+					targetId,
 				)
 			}
-			err = store.RemoveExtension(ctx, publisher, name, version)
-			if err != nil {
-				return err
-			}
 
-			summary := []string{}
+			// TODO: Allow deleting by platform as well?
+			var toDelete []storage.Version
 			if all {
-				removedCount := len(allVersions)
-				summary = append(summary, fmt.Sprintf("Removed %s", util.Plural(removedCount, "version", "")))
-				for _, version := range allVersions {
-					summary = append(summary, fmt.Sprintf("  - %s", version))
-				}
+				toDelete = allVersions
 			} else {
-				summary = append(summary, fmt.Sprintf("Removed %s", version))
+				for _, sv := range allVersions {
+					if version.Version == sv.Version {
+						toDelete = append(toDelete, sv)
+					}
+				}
+			}
+			if len(toDelete) == 0 {
+				return xerrors.Errorf("%s does not exist", targetId)
 			}
 
+			summary := []string{fmt.Sprintf("Removed %s", util.Plural(len(toDelete), "version", ""))}
+			for _, delete := range toDelete {
+				err = store.RemoveExtension(ctx, publisher, name, delete)
+				if err != nil {
+					summary = append(summary, fmt.Sprintf("  - %s (%s)", delete, err))
+				} else {
+					summary = append(summary, fmt.Sprintf("  - %s", delete))
+				}
+			}
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(summary, "\n"))
 			return err
 		},
