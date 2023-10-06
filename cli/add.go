@@ -74,7 +74,9 @@ func add() *cobra.Command {
 					return err
 				}
 				for _, file := range files {
-					s, err := doAdd(ctx, filepath.Join(args[0], file.Name()), store)
+					vsixPath := filepath.Join(args[0], file.Name())
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Adding %s...\r\n", vsixPath)
+					s, err := doAdd(ctx, vsixPath, store)
 					if err != nil {
 						failed = append(failed, file.Name())
 						summary = append(summary, fmt.Sprintf("Failed to unpack %s: %s", file.Name(), err.Error()))
@@ -83,6 +85,7 @@ func add() *cobra.Command {
 					}
 				}
 			} else {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Adding %s...\r\n", args[0])
 				summary, err = doAdd(ctx, args[0], store)
 				if err != nil {
 					return err
