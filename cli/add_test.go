@@ -41,6 +41,8 @@ func TestAdd(t *testing.T) {
 		extensions []testutil.Extension
 		// name is the name of the test.
 		name string
+		// platforms to add for the latest version of each extension.
+		platforms []storage.Platform
 		// vsixes contains raw bytes of extensions to add.  Use for failure cases.
 		vsixes [][]byte
 	}{
@@ -49,9 +51,20 @@ func TestAdd(t *testing.T) {
 			extensions: []testutil.Extension{testutil.Extensions[0]},
 		},
 		{
+			name:       "OKPlatforms",
+			extensions: []testutil.Extension{testutil.Extensions[0]},
+			platforms: []storage.Platform{
+				storage.PlatformUnknown,
+				storage.PlatformWin32X64,
+				storage.PlatformLinuxX64,
+				storage.PlatformDarwinX64,
+				storage.PlatformWeb,
+			},
+		},
+		{
 			name:   "InvalidVSIX",
 			error:  "not a valid zip",
-			vsixes: [][]byte{[]byte{}},
+			vsixes: [][]byte{{}},
 		},
 		{
 			name: "BulkOK",
@@ -72,7 +85,7 @@ func TestAdd(t *testing.T) {
 				testutil.Extensions[3],
 			},
 			vsixes: [][]byte{
-				[]byte{},
+				{},
 				[]byte("foo"),
 			},
 		},
@@ -95,7 +108,13 @@ func TestAdd(t *testing.T) {
 				create(vsix)
 			}
 			for _, ext := range test.extensions {
-				create(testutil.CreateVSIXFromExtension(t, ext))
+				if len(test.platforms) > 0 {
+					for _, platform := range test.platforms {
+						create(testutil.CreateVSIXFromExtension(t, ext, storage.Version{Version: ext.LatestVersion, TargetPlatform: platform}))
+					}
+				} else {
+					create(testutil.CreateVSIXFromExtension(t, ext, storage.Version{Version: ext.LatestVersion}))
+				}
 			}
 
 			// With multiple extensions use bulk add by pointing to the directory
@@ -108,7 +127,7 @@ func TestAdd(t *testing.T) {
 				handler := func(rw http.ResponseWriter, r *http.Request) {
 					var vsix []byte
 					if test.vsixes == nil {
-						vsix = testutil.CreateVSIXFromExtension(t, test.extensions[0])
+						vsix = testutil.CreateVSIXFromExtension(t, test.extensions[0], storage.Version{Version: test.extensions[0].LatestVersion})
 					} else {
 						vsix = test.vsixes[0]
 					}

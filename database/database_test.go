@@ -11,6 +11,7 @@ import (
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/slogtest"
 	"github.com/coder/code-marketplace/database"
+	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/testutil"
 )
 
@@ -28,44 +29,86 @@ func TestGetExtensionAssetPath(t *testing.T) {
 	}
 
 	t.Run("NoExtension", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := db.GetExtensionAssetPath(context.Background(), &database.Asset{
 			Publisher: "publisher",
 			Extension: "extension",
 			Type:      "type",
-			Version:   "version",
+			Version:   storage.Version{Version: "version"},
 		}, *baseURL)
 		require.Error(t, err)
 	})
 
 	t.Run("NoAsset", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := db.GetExtensionAssetPath(context.Background(), &database.Asset{
 			Publisher: "foo",
 			Extension: "zany",
 			Type:      "nope",
-			Version:   "1.0.0",
+			Version:   storage.Version{Version: "1.0.0"},
+		}, *baseURL)
+		require.Error(t, err)
+
+		_, err = db.GetExtensionAssetPath(context.Background(), &database.Asset{
+			Publisher: "foo",
+			Extension: "zany",
+			Type:      "nope",
+			Version:   storage.Version{Version: "1.0.0", TargetPlatform: storage.PlatformDarwinX64},
 		}, *baseURL)
 		require.Error(t, err)
 	})
 
 	t.Run("UnaddressableAsset", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := db.GetExtensionAssetPath(context.Background(), &database.Asset{
 			Publisher: "foo",
 			Extension: "zany",
 			Type:      "Unaddressable",
-			Version:   "1.0.0",
+			Version:   storage.Version{Version: "1.0.0"},
 		}, *baseURL)
 		require.Error(t, err)
 	})
 
 	t.Run("GetAsset", func(t *testing.T) {
+		t.Parallel()
+
 		path, err := db.GetExtensionAssetPath(context.Background(), &database.Asset{
 			Publisher: "foo",
 			Extension: "zany",
 			Type:      "Microsoft.VisualStudio.Services.Icons.Default",
-			Version:   "1.0.0",
+			Version:   storage.Version{Version: "1.0.0"},
 		}, *baseURL)
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprintf("%s/files/foo/zany/1.0.0/icon.png", base), path)
+	})
+
+	t.Run("GetAssetWithPlatform", func(t *testing.T) {
+		t.Parallel()
+
+		path, err := db.GetExtensionAssetPath(context.Background(), &database.Asset{
+			Publisher: "foo",
+			Extension: "zany",
+			Type:      "Microsoft.VisualStudio.Services.Icons.Default",
+			Version:   storage.Version{Version: "1.0.0", TargetPlatform: storage.PlatformWin32X64},
+		}, *baseURL)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%s/files/foo/zany/1.0.0@win32-x64/icon.png", base), path)
+
+		// All these do not append platform strings.
+		platforms := []storage.Platform{storage.PlatformUniversal, storage.PlatformUnknown, storage.PlatformUndefined}
+		for _, platform := range platforms {
+			path, err = db.GetExtensionAssetPath(context.Background(), &database.Asset{
+				Publisher: "foo",
+				Extension: "zany",
+				Type:      "Microsoft.VisualStudio.Services.Icons.Default",
+				Version:   storage.Version{Version: "1.0.0", TargetPlatform: platform},
+			}, *baseURL)
+			require.NoError(t, err)
+			require.Equal(t, fmt.Sprintf("%s/files/foo/zany/1.0.0/icon.png", base), path)
+		}
 	})
 }
 
@@ -383,7 +426,7 @@ func TestGetExtensions(t *testing.T) {
 			CheckFunc: func(t *testing.T, ext *database.Extension) {
 				require.Empty(t, ext.Categories, "categories")
 				require.Empty(t, ext.Tags, "tags")
-				require.Len(t, ext.Versions, 5, "versions")
+				require.Len(t, ext.Versions, 11, "versions")
 				for _, version := range ext.Versions {
 					require.Empty(t, version.Files, "files")
 					require.Empty(t, version.Properties, "properties")
@@ -403,11 +446,11 @@ func TestGetExtensions(t *testing.T) {
 			CheckFunc: func(t *testing.T, ext *database.Extension) {
 				require.Empty(t, ext.Categories, "categories")
 				require.Empty(t, ext.Tags, "tags")
-				require.Len(t, ext.Versions, 5, "versions")
+				require.Len(t, ext.Versions, 11, "versions")
 				for _, version := range ext.Versions {
 					// Should ignore non-addressable files.
 					require.Len(t, version.Files, 1, "files")
-					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[0].Source)
+					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version), version.Files[0].Source)
 					require.Empty(t, version.Properties, "properties")
 				}
 			},
@@ -425,11 +468,11 @@ func TestGetExtensions(t *testing.T) {
 			CheckFunc: func(t *testing.T, ext *database.Extension) {
 				require.Empty(t, ext.Categories, "categories")
 				require.Empty(t, ext.Tags, "tags")
-				require.Len(t, ext.Versions, 5, "versions")
+				require.Len(t, ext.Versions, 11, "versions")
 				for _, version := range ext.Versions {
 					require.Empty(t, version.Files, "files")
 					require.Empty(t, version.Properties, "properties")
-					require.Equal(t, fmt.Sprintf("%s/assets/foo/zany/%s", base, version.Version), version.AssetURI)
+					require.Equal(t, fmt.Sprintf("%s/assets/foo/zany/%s", base, version), version.AssetURI)
 					require.Equal(t, version.AssetURI, version.FallbackAssetURI)
 				}
 			},
@@ -463,7 +506,7 @@ func TestGetExtensions(t *testing.T) {
 			CheckFunc: func(t *testing.T, ext *database.Extension) {
 				require.Empty(t, ext.Categories, "categories")
 				require.Empty(t, ext.Tags, "tags")
-				require.Len(t, ext.Versions, 5, "versions")
+				require.Len(t, ext.Versions, 11, "versions")
 				for _, version := range ext.Versions {
 					require.Empty(t, version.Files, "files")
 					require.Len(t, version.Properties, 2, "properties")
@@ -483,8 +526,9 @@ func TestGetExtensions(t *testing.T) {
 			CheckFunc: func(t *testing.T, ext *database.Extension) {
 				require.Empty(t, ext.Categories, "categories")
 				require.Empty(t, ext.Tags, "tags")
-				require.Len(t, ext.Versions, 1, "versions")
+				require.Len(t, ext.Versions, 6, "versions") // One for each platform.
 				for _, version := range ext.Versions {
+					require.Equal(t, "3.0.0", version.Version.Version)
 					require.Empty(t, version.Files, "files")
 					require.Empty(t, version.Properties, "properties")
 				}
@@ -503,10 +547,10 @@ func TestGetExtensions(t *testing.T) {
 			CheckFunc: func(t *testing.T, ext *database.Extension) {
 				require.Len(t, ext.Categories, 1, "categories")
 				require.Len(t, ext.Tags, 1, "tags")
-				require.Len(t, ext.Versions, 5, "versions")
+				require.Len(t, ext.Versions, 11, "versions")
 				for _, version := range ext.Versions {
 					require.Len(t, version.Files, 1, "files")
-					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version.Version), version.Files[0].Source)
+					require.Equal(t, fmt.Sprintf("%s/files/foo/zany/%s/icon.png", base, version), version.Files[0].Source)
 					require.Len(t, version.Properties, 2, "properties")
 					require.Equal(t, version.AssetURI, version.FallbackAssetURI)
 				}

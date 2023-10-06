@@ -20,7 +20,7 @@ type Extension struct {
 	Properties    []storage.VSIXProperty
 	Description   string
 	Categories    string
-	Versions      []string
+	Versions      []storage.Version
 	LatestVersion string
 	Dependencies  []string
 	Pack          []string
@@ -47,7 +47,19 @@ var Extensions = []Extension{
 				Value: "d.e",
 			},
 		},
-		Versions:      []string{"1.0.0", "2.0.0", "3.0.0", "1.5.2", "2.2.2"},
+		Versions: []storage.Version{
+			{Version: "1.0.0"},
+			{Version: "1.0.0", TargetPlatform: storage.PlatformWin32X64},
+			{Version: "2.0.0"},
+			{Version: "3.0.0"},
+			{Version: "3.0.0", TargetPlatform: storage.PlatformLinuxX64},
+			{Version: "3.0.0", TargetPlatform: storage.PlatformLinuxArm64},
+			{Version: "3.0.0", TargetPlatform: storage.PlatformWin32X64},
+			{Version: "3.0.0", TargetPlatform: storage.PlatformAlpineX64},
+			{Version: "3.0.0", TargetPlatform: storage.PlatformDarwinX64},
+			{Version: "1.5.2"},
+			{Version: "2.2.2"},
+		},
 		LatestVersion: "3.0.0",
 		Dependencies:  []string{"d.e"},
 		Pack:          []string{"a.b", "b.c"},
@@ -68,7 +80,7 @@ var Extensions = []Extension{
 				Value: "",
 			},
 		},
-		Versions:      []string{"version1"},
+		Versions:      []storage.Version{{Version: "version1"}},
 		LatestVersion: "version1",
 	},
 	{
@@ -77,7 +89,7 @@ var Extensions = []Extension{
 		Description:   "squigly foo and more foo bar baz",
 		Tags:          "tag1,tag2",
 		Categories:    "category1,category2",
-		Versions:      []string{"version1", "version2"},
+		Versions:      []storage.Version{{Version: "version1"}, {Version: "version2"}},
 		LatestVersion: "version2",
 	},
 	{
@@ -86,7 +98,7 @@ var Extensions = []Extension{
 		Description:   "frobbles the frobnozzle",
 		Tags:          "tag3,tag4,tag5",
 		Categories:    "category1",
-		Versions:      []string{"version1", "version2"},
+		Versions:      []storage.Version{{Version: "version1"}, {Version: "version2"}},
 		LatestVersion: "version2",
 	},
 	{
@@ -95,18 +107,19 @@ var Extensions = []Extension{
 		Description:   "qqqqqqqqqqqqqqqqqqq",
 		Tags:          "qq,qqq,qqqq",
 		Categories:    "q",
-		Versions:      []string{"qqq", "q"},
+		Versions:      []storage.Version{{Version: "qqq"}, {Version: "q"}},
 		LatestVersion: "qqq",
 	},
 }
 
-func ConvertExtensionToManifest(ext Extension, version string) *storage.VSIXManifest {
+func ConvertExtensionToManifest(ext Extension, version storage.Version) *storage.VSIXManifest {
 	return &storage.VSIXManifest{
 		Metadata: storage.VSIXMetadata{
 			Identity: storage.VSIXIdentity{
-				ID:        ext.Name,
-				Version:   version,
-				Publisher: ext.Publisher,
+				ID:             ext.Name,
+				Version:        version.Version,
+				Publisher:      ext.Publisher,
+				TargetPlatform: version.TargetPlatform,
 			},
 			Properties: storage.VSIXProperties{
 				Property: ext.Properties,
@@ -121,7 +134,7 @@ func ConvertExtensionToManifest(ext Extension, version string) *storage.VSIXMani
 	}
 }
 
-func ConvertExtensionToManifestBytes(t *testing.T, ext Extension, version string) []byte {
+func ConvertExtensionToManifestBytes(t *testing.T, ext Extension, version storage.Version) []byte {
 	manifestBytes, err := xml.Marshal(ConvertExtensionToManifest(ext, version))
 	require.NoError(t, err)
 	return manifestBytes
@@ -171,6 +184,6 @@ func CreateVSIXFromPackageJSON(t *testing.T, packageJSON *storage.VSIXPackageJSO
 
 // CreateVSIXFromExtension returns the bytes for a VSIX file containing the
 // manifest for the provided test extension and an icon.
-func CreateVSIXFromExtension(t *testing.T, ext Extension) []byte {
-	return CreateVSIXFromManifest(t, ConvertExtensionToManifest(ext, ext.LatestVersion))
+func CreateVSIXFromExtension(t *testing.T, ext Extension, version storage.Version) []byte {
+	return CreateVSIXFromManifest(t, ConvertExtensionToManifest(ext, version))
 }

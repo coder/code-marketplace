@@ -217,17 +217,20 @@ func (api *API) extensionQuery(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) assetRedirect(rw http.ResponseWriter, r *http.Request) {
-	// TODO: Asset URIs can contain a targetPlatform query variable.
 	baseURL := httpapi.RequestBaseURL(r, "/")
 	assetType := storage.AssetType(chi.URLParam(r, "type"))
 	if assetType == "vspackage" {
 		assetType = storage.VSIXAssetType
 	}
+	version := storage.VersionFromString(chi.URLParam(r, "version"))
+	if version.TargetPlatform == "" {
+		version.TargetPlatform = storage.Platform(r.URL.Query().Get("targetPlatform"))
+	}
 	url, err := api.Database.GetExtensionAssetPath(r.Context(), &database.Asset{
 		Extension: chi.URLParam(r, "extension"),
 		Publisher: chi.URLParam(r, "publisher"),
 		Type:      assetType,
-		Version:   chi.URLParam(r, "version"),
+		Version:   version,
 	}, baseURL)
 	if err != nil && os.IsNotExist(err) {
 		httpapi.Write(rw, http.StatusNotFound, httpapi.ErrorResponse{

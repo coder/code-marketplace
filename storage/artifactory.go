@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/mod/semver"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -90,7 +89,7 @@ func NewArtifactoryStorage(ctx context.Context, options *ArtifactoryOptions) (*A
 	start := time.Now()
 	count := 0
 	var eg errgroup.Group
-	err := s.WalkExtensions(ctx, func(manifest *VSIXManifest, versions []string) error {
+	err := s.WalkExtensions(ctx, func(manifest *VSIXManifest, versions []Version) error {
 		for _, ver := range versions {
 			count++
 			ver := ver
@@ -100,8 +99,10 @@ func NewArtifactoryStorage(ctx context.Context, options *ArtifactoryOptions) (*A
 				if err != nil && !errors.Is(err, context.Canceled) {
 					return err
 				} else if err != nil {
-					id := ExtensionID(identity.Publisher, identity.ID, ver)
-					s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err), slog.F("id", id))
+					id := ExtensionID(identity.Publisher, identity.ID, ver.Version)
+					s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err),
+						slog.F("id", id),
+						slog.F("targetPlatform", ver.TargetPlatform))
 				}
 				return nil
 			})
@@ -215,7 +216,10 @@ func (s *Artifactory) upload(ctx context.Context, endpoint string, r io.Reader) 
 func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
-	dir := path.Join(identity.Publisher, identity.ID, identity.Version)
+	dir := path.Join(identity.Publisher, identity.ID, Version{
+		Version:        identity.Version,
+		TargetPlatform: identity.TargetPlatform,
+	}.String())
 
 	// Uploading every file in an extension such as ms-python.python can take
 	// quite a while (16 minutes!!).  As a compromise only extract a file if it
@@ -252,7 +256,7 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 	}
 
 	// Copy the VSIX itself as well.
-	vsixName := fmt.Sprintf("%s.vsix", ExtensionIDFromManifest(manifest))
+	vsixName := fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest))
 	_, err = s.upload(ctx, path.Join(dir, vsixName), bytes.NewReader(vsix))
 	if err != nil {
 		return "", err
@@ -282,24 +286,24 @@ func (s *Artifactory) FileServer() http.Handler {
 	})
 }
 
-func (s *Artifactory) Manifest(ctx context.Context, publisher, name, version string) (*VSIXManifest, error) {
+func (s *Artifactory) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
 	// These queries are so slow it seems worth the extra memory to cache the
 	// manifests for future use.
 	// TODO: Remove manifests that are no longer found in the list to prevent
 	// indefinitely caching manifests belonging to extensions that have since been
 	// removed or dump the cache periodically.
-	id := ExtensionID(publisher, name, version)
-	rawMutex, _ := s.manifestMutexes.LoadOrStore(id, &sync.Mutex{})
+	vsixName := ExtensionVSIXName(publisher, name, version)
+	rawMutex, _ := s.manifestMutexes.LoadOrStore(vsixName, &sync.Mutex{})
 	mutex := rawMutex.(*sync.Mutex)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	rawManifest, ok := s.manifests.Load(id)
+	rawManifest, ok := s.manifests.Load(vsixName)
 	if ok {
 		return rawManifest.(*VSIXManifest), nil
 	}
 
-	reader, _, err := s.read(ctx, path.Join(publisher, name, version, "extension.vsixmanifest"))
+	reader, _, err := s.read(ctx, path.Join(publisher, name, version.String(), "extension.vsixmanifest"))
 	if err != nil {
 		return nil, err
 	}
@@ -316,16 +320,16 @@ func (s *Artifactory) Manifest(ctx context.Context, publisher, name, version str
 
 	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 		Type:        VSIXAssetType,
-		Path:        fmt.Sprintf("%s.vsix", ExtensionIDFromManifest(manifest)),
+		Path:        fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest)),
 		Addressable: "true",
 	})
 
-	rawManifest, _ = s.manifests.LoadOrStore(id, manifest)
+	rawManifest, _ = s.manifests.LoadOrStore(vsixName, manifest)
 	return rawManifest.(*VSIXManifest), nil
 }
 
-func (s *Artifactory) RemoveExtension(ctx context.Context, publisher, name, version string) error {
-	_, err := s.delete(ctx, path.Join(publisher, name, version))
+func (s *Artifactory) RemoveExtension(ctx context.Context, publisher, name string, version Version) error {
+	_, err := s.delete(ctx, path.Join(publisher, name, version.String()))
 	return err
 }
 
@@ -333,7 +337,7 @@ type extension struct {
 	manifest  *VSIXManifest
 	name      string
 	publisher string
-	versions  []string
+	versions  []Version
 }
 
 func (s *Artifactory) listWithCache(ctx context.Context) *[]ArtifactoryFile {
@@ -350,7 +354,7 @@ func (s *Artifactory) listWithCache(ctx context.Context) *[]ArtifactoryFile {
 	return s.listCache
 }
 
-func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error {
+func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error {
 	// Listing one directory at a time is very slow so get them all at once.  If
 	// we already fetched it recently just use that since getting them all at once
 	// is also pretty slow (on the parsing end).
@@ -368,12 +372,12 @@ func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIX
 			id := fmt.Sprintf("%s.%s", parts[1], parts[2])
 			e, ok := extensions[id]
 			if ok {
-				e.versions = append(e.versions, parts[3])
+				e.versions = append(e.versions, VersionFromString(parts[3]))
 			} else {
 				extensions[id] = &extension{
 					name:      parts[2],
 					publisher: parts[1],
-					versions:  []string{parts[3]},
+					versions:  []Version{VersionFromString(parts[3])},
 				}
 			}
 		}
@@ -387,14 +391,16 @@ func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIX
 	defer cancel()
 	for _, ext := range extensions {
 		ext := ext
-		sort.Sort(sort.Reverse(semver.ByVersion(ext.versions)))
+		sort.Sort(ByVersion(ext.versions))
 		eg.Go(func() error {
 			manifest, err := s.Manifest(ctx, ext.publisher, ext.name, ext.versions[0])
 			if err != nil && errors.Is(err, context.Canceled) {
 				return err
 			} else if err != nil {
-				id := ExtensionID(ext.publisher, ext.name, ext.versions[0])
-				s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err), slog.F("id", id))
+				id := ExtensionID(ext.publisher, ext.name, ext.versions[0].Version)
+				s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err),
+					slog.F("id", id),
+					slog.F("targetPlatform", ext.versions[0].TargetPlatform))
 			} else {
 				ext.manifest = manifest
 			}
@@ -413,19 +419,20 @@ func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIX
 	return nil
 }
 
-func (s *Artifactory) Versions(ctx context.Context, publisher, name string) ([]string, error) {
+func (s *Artifactory) Versions(ctx context.Context, publisher, name string) ([]Version, error) {
 	files, _, err := s.list(ctx, path.Join(publisher, name), 1)
 	if err != nil {
 		return nil, err
 	}
-	versions := []string{}
+	versions := []Version{}
 	for _, file := range files {
 		// There should only be directories but check just in case.
 		if file.Folder {
 			// The files come with leading slashes so remove them.
-			versions = append(versions, strings.TrimLeft(file.URI, "/"))
+			versionDir := strings.TrimLeft(file.URI, "/")
+			versions = append(versions, VersionFromString(versionDir))
 		}
 	}
-	sort.Sort(sort.Reverse(semver.ByVersion(versions)))
+	sort.Sort(ByVersion(versions))
 	return versions, nil
 }

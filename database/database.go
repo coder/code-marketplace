@@ -123,13 +123,12 @@ type ExtPublisher struct {
 // ExtVersion implements IRawGalleryExtensionVersion.
 // https://github.com/microsoft/vscode/blob/29234f0219bdbf649d6107b18651a1038d6357ac/src/vs/platform/extensionManagement/common/extensionGalleryService.ts#L42-L50
 type ExtVersion struct {
-	Version          string        `json:"version"`
+	storage.Version
 	LastUpdated      time.Time     `json:"lastUpdated"`
 	AssetURI         string        `json:"assetUri"`
 	FallbackAssetURI string        `json:"fallbackAssetUri"`
 	Files            []ExtFile     `json:"files"`
 	Properties       []ExtProperty `json:"properties,omitempty"`
-	TargetPlatform   string        `json:"targetPlatform,omitempty"`
 }
 
 // ExtFile implements IRawGalleryExtensionFile.
@@ -157,7 +156,7 @@ type Asset struct {
 	Extension string
 	Publisher string
 	Type      storage.AssetType
-	Version   string
+	Version   storage.Version
 }
 
 type Database interface {

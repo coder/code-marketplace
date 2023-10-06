@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/mod/semver"
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
@@ -44,14 +45,40 @@ type VSIXMetadata struct {
 	Categories   string
 }
 
-// VSIXManifest implement XMLManifest.PackageManifest.Metadata.Identity.
+// Platform implements TargetPlatform.
+// https://github.com/microsoft/vscode/blob/main/src/vs/platform/extensions/common/extensions.ts#L291-L311
+type Platform string
+
+const (
+	PlatformWin32X64   Platform = "win32-x64"
+	PlatformWin32Ia32  Platform = "win32-ia32"
+	PlatformWin32Arm64 Platform = "win32-arm64"
+
+	PlatformLinuxX64   Platform = "linux-x64"
+	PlatformLinuxArm64 Platform = "linux-arm64"
+	PlatformLinuxArmhf Platform = "linux-armhf"
+
+	PlatformAlpineX64   Platform = "alpine-x64"
+	PlatformAlpineArm64 Platform = "alpine-arm64"
+
+	PlatformDarwinX64   Platform = "darwin-x64"
+	PlatformDarwinArm64 Platform = "darwin-arm64"
+
+	PlatformWeb Platform = "web"
+
+	PlatformUniversal Platform = "universal"
+	PlatformUnknown   Platform = "unknown"
+	PlatformUndefined Platform = "undefined"
+)
+
+// VSIXManifest implements XMLManifest.PackageManifest.Metadata.Identity.
 // https://github.com/microsoft/vscode-vsce/blob/main/src/xml.ts#L14
 type VSIXIdentity struct {
 	// ID correlates to ExtensionName, *not* ExtensionID.
-	ID             string `xml:"Id,attr"`
-	Version        string `xml:",attr"`
-	Publisher      string `xml:",attr"`
-	TargetPlatform string `xml:",attr"`
+	ID             string   `xml:"Id,attr"`
+	Version        string   `xml:",attr"`
+	Publisher      string   `xml:",attr"`
+	TargetPlatform Platform `xml:",attr"`
 }
 
 // VSIXProperties implements XMLManifest.PackageManifest.Metadata.Properties.
@@ -102,6 +129,69 @@ type Options struct {
 	Logger      slog.Logger
 }
 
+// Version is a subset of database.ExtVersion.
+type Version struct {
+	TargetPlatform Platform `json:"targetPlatform,omitempty"`
+	Version        string   `json:"version"`
+}
+
+func (v Version) isUniversal() bool {
+	switch v.TargetPlatform {
+	case PlatformUniversal, PlatformUnknown, PlatformUndefined, "":
+		return true
+	default:
+		return false
+	}
+}
+
+// Strings encodes the version and platform into a string that can be reversed
+// by VersionFromString.  For example 1.0.0@linux-x64.  For universal versions
+// the @platform will be omitted.
+//
+// For directory names it might have been ideal to a nested path such as
+// `version/platform` but we use this instead for backwards compatibility since
+// we were unpacking directly into the `version` directory.  Otherwise, we would
+// have to migrate existing extensions or have a mechanism for detecting in
+// which format the extension was being stored.
+func (v Version) String() string {
+	if v.isUniversal() {
+		return v.Version
+	} else {
+		return fmt.Sprintf("%s@%s", v.Version, v.TargetPlatform)
+	}
+}
+
+// VersionFromString creates a version from a version directory.  More or less it
+// reverses Version.String().  Since @ is not allowed in semantic versions this
+// should be future-proof.
+func VersionFromString(dir string) Version {
+	parts := strings.SplitN(dir, "@", 2)
+	var platform Platform
+	if len(parts) > 1 {
+		platform = Platform(parts[1])
+	}
+	return Version{
+		Version:        parts[0],
+		TargetPlatform: platform,
+	}
+}
+
+// ByVersion implements sort.Interface for sorting Version slices.
+type ByVersion []Version
+
+func (vs ByVersion) Len() int      { return len(vs) }
+func (vs ByVersion) Swap(i, j int) { vs[i], vs[j] = vs[j], vs[i] }
+func (vs ByVersion) Less(i, j int) bool {
+	cmp := semver.Compare(vs[i].Version, vs[j].Version)
+	if cmp != 0 {
+		return cmp >= 0
+	}
+	if vs[i].Version == vs[j].Version {
+		return vs[i].TargetPlatform < vs[j].TargetPlatform
+	}
+	return vs[i].Version >= vs[j].Version
+}
+
 type Storage interface {
 	// AddExtension adds the provided VSIX into storage and returns the location
 	// for verification purposes.
@@ -112,20 +202,23 @@ type Storage interface {
 	// Manifest returns the manifest bytes for the provided extension.  The
 	// extension asset itself (the VSIX) will be included on the manifest even if
 	// it does not exist on the manifest on disk.
-	Manifest(ctx context.Context, publisher, name, version string) (*VSIXManifest, error)
+	Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error)
 	// RemoveExtension removes the provided version of the extension.  It errors
-	// if the provided version does not exist or if removing it fails.  If version
-	// is blank all versions of that extension will be removed.
-	RemoveExtension(ctx context.Context, publisher, name, version string) error
+	// if the version does not exist or if removing it fails.  If both the version
+	// and platform are blank all versions of that extension will be removed.  If
+	// only the platform is blank the universal version will be removed.  If only
+	// the version is blank it will error; it is not currently possible to delete
+	// all versions for a specific platform.
+	RemoveExtension(ctx context.Context, publisher, name string, version Version) error
 	// Versions returns the available versions of the provided extension in sorted
 	// order.  If the extension does not exits it returns an error.
-	Versions(ctx context.Context, publisher, name string) ([]string, error)
+	Versions(ctx context.Context, publisher, name string) ([]Version, error)
 	// WalkExtensions applies a function over every extension.  The extension
 	// points to the latest version and the versions slice includes all the
 	// versions in sorted order including the latest version (which will be in
 	// [0]).  If the function returns an error the error is immediately returned
 	// which aborts the walk.
-	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []string) error) error
+	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error
 }
 
 const ArtifactoryTokenEnvKey = "ARTIFACTORY_TOKEN"
@@ -240,7 +333,8 @@ func ReadVSIX(ctx context.Context, source string) ([]byte, error) {
 	})
 }
 
-// ExtensionIDFromManifest returns the full ID of an extension.
+// ExtensionIDFromManifest returns the full ID of an extension without the the
+// platform, for example publisher.name@0.0.1.
 func ExtensionIDFromManifest(manifest *VSIXManifest) string {
 	return ExtensionID(
 		manifest.Metadata.Identity.Publisher,
@@ -248,13 +342,36 @@ func ExtensionIDFromManifest(manifest *VSIXManifest) string {
 		manifest.Metadata.Identity.Version)
 }
 
-// ExtensionID returns the full ID of an extension.
+// ExtensionID returns the full ID of an extension without the platform, for
+// example publisher.name@0.0.1.
 func ExtensionID(publisher, name, version string) string {
 	return fmt.Sprintf("%s.%s@%s", publisher, name, version)
 }
 
-// ParseExtensionID parses an extension ID into its separate parts: publisher,
-// name, and version (version may be blank).
+// ExtensionVSIXNameFromManifest returns the full ID of an extension including
+// the platform if not universal, for example publisher.name-0.0.1 or
+// publisher.name-0.0.1@linux-x64.
+func ExtensionVSIXNameFromManifest(manifest *VSIXManifest) string {
+	return ExtensionVSIXName(
+		manifest.Metadata.Identity.Publisher,
+		manifest.Metadata.Identity.ID,
+		Version{
+			Version:        manifest.Metadata.Identity.Version,
+			TargetPlatform: manifest.Metadata.Identity.TargetPlatform,
+		})
+}
+
+// ExtensionVSIXName returns the full ID of an extension including the
+// platform if not universal, for example publisher.name-0.0.1 or
+// publisher.name-0.0.1@linux-x64.
+func ExtensionVSIXName(publisher, name string, version Version) string {
+	return fmt.Sprintf("%s.%s-%s", publisher, name, version)
+}
+
+// ParseExtensionID parses an full or partial extension ID into its separate
+// parts: publisher, name, and version (version may be blank).  It does not
+// support specifying the platform and requires that the delimiter for the
+// version be @.
 func ParseExtensionID(id string) (string, string, string, error) {
 	re := regexp.MustCompile(`^([^.]+)\.([^@]+)@?(.*)$`)
 	match := re.FindAllStringSubmatch(id, -1)

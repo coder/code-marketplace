@@ -31,7 +31,7 @@ func (db *MockDB) GetExtensionAssetPath(ctx context.Context, asset *database.Ass
 	if asset.Type == storage.VSIXAssetType {
 		assetPath = "extension.vsix"
 	}
-	return strings.Join([]string{baseURL.Path, "files", asset.Publisher, asset.Extension, asset.Version, assetPath}, "/"), nil
+	return strings.Join([]string{baseURL.Path, "files", asset.Publisher, asset.Extension, asset.Version.String(), assetPath}, "/"), nil
 }
 
 func (db *MockDB) GetExtensions(ctx context.Context, filter database.Filter, flags database.Flag, baseURL url.URL) ([]*database.Extension, int, error) {
