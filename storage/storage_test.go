@@ -1159,6 +1159,17 @@ func TestSortByVersion(t *testing.T) {
 				{Version: "1.0.0", TargetPlatform: storage.PlatformWin32X64},
 			},
 		},
+		{
+			name: "CompareMSPythonStyle",
+			versions: []storage.Version{
+				{Version: "2023.9.1102792234"},
+				{Version: "2023.10.1002811100"},
+			},
+			expected: []storage.Version{
+				{Version: "2023.10.1002811100"},
+				{Version: "2023.9.1102792234"},
+			},
+		},
 	}
 
 	for _, test := range tests {

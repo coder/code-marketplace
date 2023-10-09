@@ -182,7 +182,8 @@ type ByVersion []Version
 func (vs ByVersion) Len() int      { return len(vs) }
 func (vs ByVersion) Swap(i, j int) { vs[i], vs[j] = vs[j], vs[i] }
 func (vs ByVersion) Less(i, j int) bool {
-	cmp := semver.Compare(vs[i].Version, vs[j].Version)
+	// Go's semver library requires a v prefix.
+	cmp := semver.Compare("v"+vs[i].Version, "v"+vs[j].Version)
 	if cmp != 0 {
 		return cmp >= 0
 	}
