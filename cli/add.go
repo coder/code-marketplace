@@ -66,7 +66,6 @@ func add() *cobra.Command {
 				isDir = stat.IsDir()
 			}
 
-			var summary []string
 			var failed []string
 			if isDir {
 				files, err := os.ReadDir(args[0])
@@ -74,33 +73,29 @@ func add() *cobra.Command {
 					return err
 				}
 				for _, file := range files {
-					vsixPath := filepath.Join(args[0], file.Name())
-					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Adding %s...\r\n", vsixPath)
-					s, err := doAdd(ctx, vsixPath, store)
+					s, err := doAdd(ctx, filepath.Join(args[0], file.Name()), store)
 					if err != nil {
+						_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Failed to unpack %s: %s\n", file.Name(), err.Error())
 						failed = append(failed, file.Name())
-						summary = append(summary, fmt.Sprintf("Failed to unpack %s: %s", file.Name(), err.Error()))
 					} else {
-						summary = append(summary, s...)
+						_, _ = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(s, "\n"))
 					}
 				}
 			} else {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Adding %s...\r\n", args[0])
-				summary, err = doAdd(ctx, args[0], store)
+				s, err := doAdd(ctx, args[0], store)
 				if err != nil {
 					return err
 				}
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(s, "\n"))
 			}
 
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(summary, "\n"))
-			failedCount := len(failed)
-			if failedCount > 0 {
+			if len(failed) > 0 {
 				return xerrors.Errorf(
 					"Failed to add %s: %s",
-					util.Plural(failedCount, "extension", ""),
+					util.Plural(len(failed), "extension", ""),
 					strings.Join(failed, ", "))
 			}
-			return err
+			return nil
 		},
 	}
 

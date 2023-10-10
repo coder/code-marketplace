@@ -155,7 +155,9 @@ func TestAdd(t *testing.T) {
 					require.Regexp(t, test.error, err.Error())
 				} else {
 					require.NoError(t, err)
+					require.NotContains(t, output, "Failed to add")
 				}
+
 				// Should list all the extensions that worked.
 				for _, ext := range test.extensions {
 					// Should exist on disk.
