@@ -97,17 +97,25 @@ func remove() *cobra.Command {
 				return xerrors.Errorf("%s does not exist", targetId)
 			}
 
-			summary := []string{fmt.Sprintf("Removed %s", util.Plural(len(toDelete), "version", ""))}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Removing %s...\n", util.Plural(len(toDelete), "version", ""))
+			var failed []string
 			for _, delete := range toDelete {
 				err = store.RemoveExtension(ctx, publisher, name, delete)
 				if err != nil {
-					summary = append(summary, fmt.Sprintf("  - %s (%s)", delete, err))
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  - %s (%s)\n", delete, err)
+					failed = append(failed, delete.String())
 				} else {
-					summary = append(summary, fmt.Sprintf("  - %s", delete))
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  - %s\n", delete)
 				}
 			}
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.Join(summary, "\n"))
-			return err
+
+			if len(failed) > 0 {
+				return xerrors.Errorf(
+					"Failed to remove %s: %s",
+					util.Plural(len(failed), "version", ""),
+					strings.Join(failed, ", "))
+			}
+			return nil
 		},
 	}
 

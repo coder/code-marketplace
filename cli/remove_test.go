@@ -35,10 +35,9 @@ func TestRemove(t *testing.T) {
 	tests := []struct {
 		// all means to pass --all.
 		all bool
-		// error is the expected error.
+		// error is the expected error, if any.
 		error string
-		// expected contains the versions should have been deleted.  It is ignored
-		// in the case of an expected error.
+		// expected contains the versions should have been deleted, if any.
 		expected []storage.Version
 		// extension is the extension to remove.  Every version of
 		// testutil.Extensions[0] will be added before each test.
@@ -170,8 +169,17 @@ func TestRemove(t *testing.T) {
 				require.Regexp(t, test.error, err.Error())
 			} else {
 				require.NoError(t, err)
-				require.Contains(t, output, fmt.Sprintf("Removed %d version", len(test.expected)))
+				require.NotContains(t, output, "Failed to remove")
+			}
+
+			// Should list all the extensions that were able to be removed.
+			if len(test.expected) > 0 {
+				require.Contains(t, output, fmt.Sprintf("Removing %d version", len(test.expected)))
 				for _, version := range test.expected {
+					// Should not exist on disk.
+					dest := filepath.Join(extdir, test.extension.Publisher, test.extension.Name, version.String())
+					_, err := os.Stat(dest)
+					require.Error(t, err)
 					require.Contains(t, output, fmt.Sprintf("  - %s\n", version))
 				}
 			}
