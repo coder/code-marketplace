@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [2.0.0](https://github.com/coder/code-marketplace/releases/tag/v2.0.0) - 2023-10-11
+
+### Breaking changes
+
+- When removing extensions, the version is now delineated by `@` instead of `-`
+  (for example `remove vscodevim.vim@1.0.0`). This fixes being unable to remove
+  extensions with `-` in their names. Removal is the only backwards-incompatible
+  change; extensions are still added, stored, and queried the same way.
+
+### Added
+
+- Support for platform-specific extensions. Previously all versions would have
+  been treated as universal and overwritten each other but now versions for
+  different platforms will be stored separately and show up separately in the
+  API response. If there are platform-specific versions that have already been
+  added, they will continue to be treated as universal versions so these should
+  be removed and re-added to be properly registered as platform-specific.
+
 ## [1.2.2](https://github.com/coder/code-marketplace/releases/tag/v1.2.2) - 2023-05-30
 
 ### Changed
