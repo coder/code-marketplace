@@ -585,6 +585,9 @@ func TestReadVSIXManifest(t *testing.T) {
 	tests := []struct {
 		// error is the expected error, if any.
 		error string
+		// expected is the expected manifest.  If not provided, check against
+		// `manifest` instead.
+		expected *storage.VSIXManifest
 		// manifest is the manifest from which to create the VSIX.  Use `vsix` to
 		// specify raw bytes instead.
 		manifest *storage.VSIXManifest
@@ -604,6 +607,78 @@ func TestReadVSIXManifest(t *testing.T) {
 						ID:        "bar",
 						Version:   "baz",
 					},
+				},
+			},
+		},
+		{
+			name: "SpaceSeparatedFlags",
+			manifest: &storage.VSIXManifest{
+				Metadata: storage.VSIXMetadata{
+					Identity: storage.VSIXIdentity{
+						Publisher: "foo",
+						ID:        "bar",
+						Version:   "baz",
+					},
+					GalleryFlags: "Public Preview",
+				},
+			},
+			expected: &storage.VSIXManifest{
+				Metadata: storage.VSIXMetadata{
+					Identity: storage.VSIXIdentity{
+						Publisher: "foo",
+						ID:        "bar",
+						Version:   "baz",
+					},
+					GalleryFlags: "public, preview",
+				},
+			},
+		},
+		{
+			name: "CommaSpaceSeparatedFlags",
+			manifest: &storage.VSIXManifest{
+				Metadata: storage.VSIXMetadata{
+					Identity: storage.VSIXIdentity{
+						Publisher: "foo",
+						ID:        "bar",
+						Version:   "baz",
+					},
+					GalleryFlags: "public, preview",
+				},
+			},
+		},
+		{
+			name: "CommaSpaceSpaceSeparatedFlags",
+			manifest: &storage.VSIXManifest{
+				Metadata: storage.VSIXMetadata{
+					Identity: storage.VSIXIdentity{
+						Publisher: "foo",
+						ID:        "bar",
+						Version:   "baz",
+					},
+					GalleryFlags: "public,  preview",
+				},
+			},
+			expected: &storage.VSIXManifest{
+				Metadata: storage.VSIXMetadata{
+					Identity: storage.VSIXIdentity{
+						Publisher: "foo",
+						ID:        "bar",
+						Version:   "baz",
+					},
+					GalleryFlags: "public, preview",
+				},
+			},
+		},
+		{
+			name: "CommaSeparatedFlags",
+			manifest: &storage.VSIXManifest{
+				Metadata: storage.VSIXMetadata{
+					Identity: storage.VSIXIdentity{
+						Publisher: "foo",
+						ID:        "bar",
+						Version:   "baz",
+					},
+					GalleryFlags: "public,preview",
 				},
 			},
 		},
@@ -670,8 +745,12 @@ func TestReadVSIXManifest(t *testing.T) {
 				require.Error(t, err)
 				require.Regexp(t, test.error, err.Error())
 			} else {
+				expected := test.expected
+				if expected == nil {
+					expected = test.manifest
+				}
 				require.NoError(t, err)
-				require.Equal(t, test.manifest, manifest)
+				require.Equal(t, expected, manifest)
 			}
 		})
 	}

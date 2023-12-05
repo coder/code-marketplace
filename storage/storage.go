@@ -271,7 +271,21 @@ func parseVSIXManifest(reader io.Reader) (*VSIXManifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vm, validateManifest(vm)
+	err = validateManifest(vm)
+	if err != nil {
+		return vm, err
+	}
+	// The manifest stores these as capitalized space-delimited strings but we
+	// want to present them as lowercased comma-separated strings to VS Code.
+	// For example, "Public Preview" becomes "public, preview".  Make sure to
+	// handle the case where they are already comma-separated, just in case.
+	flags := strings.Fields(vm.Metadata.GalleryFlags)
+	converted := make([]string, len(flags))
+	for i, flag := range flags {
+		converted[i] = strings.ToLower(strings.TrimRight(flag, ","))
+	}
+	vm.Metadata.GalleryFlags = strings.Join(converted, ", ")
+	return vm, nil
 }
 
 // validateManifest checks a manifest for issues.
