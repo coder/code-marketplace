@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [2.0.1](https://github.com/coder/code-marketplace/releases/tag/v2.0.1) - 2023-12-08
+
+### Fixed
+
+- Extensions with problematic UTF-8 characters will no longer cause a panic.
+- Preview extensions will now show up as such.
+
 ## [2.0.0](https://github.com/coder/code-marketplace/releases/tag/v2.0.0) - 2023-10-11
 
 ### Breaking changes
