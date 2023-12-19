@@ -129,6 +129,13 @@ type Options struct {
 	Logger      slog.Logger
 }
 
+type extension struct {
+	manifest  *VSIXManifest
+	name      string
+	publisher string
+	versions  []Version
+}
+
 // Version is a subset of database.ExtVersion.
 type Version struct {
 	TargetPlatform Platform `json:"targetPlatform,omitempty"`

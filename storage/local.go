@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
+	"time"
 
 	"cdr.dev/slog"
 )
@@ -16,8 +18,12 @@ import (
 // copying the VSIX and extracting said VSIX to a tree structure in the form of
 // publisher/extension/version to easily serve individual assets via HTTP.
 type Local struct {
-	extdir string
-	logger slog.Logger
+	listCache      []extension
+	listDuration   time.Duration
+	listExpiration time.Time
+	listMutex      sync.Mutex
+	extdir         string
+	logger         slog.Logger
 }
 
 func NewLocalStorage(extdir string, logger slog.Logger) (*Local, error) {
@@ -26,9 +32,54 @@ func NewLocalStorage(extdir string, logger slog.Logger) (*Local, error) {
 		return nil, err
 	}
 	return &Local{
-		extdir: extdir,
-		logger: logger,
+		// TODO: Eject the cache when adding/removing extensions and/or add a
+		// command to eject the cache?
+		extdir:       extdir,
+		listDuration: time.Minute, // TODO: Make duration configurable
+		logger:       logger,
 	}, nil
+}
+
+func (s *Local) list(ctx context.Context) []extension {
+	var list []extension
+	publishers, err := s.getDirNames(ctx, s.extdir)
+	if err != nil {
+		s.logger.Error(ctx, "Error reading publisher", slog.Error(err))
+	}
+	for _, publisher := range publishers {
+		ctx := slog.With(ctx, slog.F("publisher", publisher))
+		dir := filepath.Join(s.extdir, publisher)
+
+		extensions, err := s.getDirNames(ctx, dir)
+		if err != nil {
+			s.logger.Error(ctx, "Error reading extensions", slog.Error(err))
+		}
+		for _, name := range extensions {
+			ctx := slog.With(ctx, slog.F("extension", name))
+			versions, err := s.Versions(ctx, publisher, name)
+			if err != nil {
+				s.logger.Error(ctx, "Error reading versions", slog.Error(err))
+			}
+			if len(versions) == 0 {
+				continue
+			}
+
+			// The manifest from the latest version is used for filtering.
+			manifest, err := s.Manifest(ctx, publisher, name, versions[0])
+			if err != nil {
+				s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err))
+				continue
+			}
+
+			list = append(list, extension{
+				manifest,
+				name,
+				publisher,
+				versions,
+			})
+		}
+	}
+	return list
 }
 
 func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
@@ -118,39 +169,23 @@ func (s *Local) Versions(ctx context.Context, publisher, name string) ([]Version
 	return versions, err
 }
 
-func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error {
-	publishers, err := s.getDirNames(ctx, s.extdir)
-	if err != nil {
-		s.logger.Error(ctx, "Error reading publisher", slog.Error(err))
+func (s *Local) listWithCache(ctx context.Context) []extension {
+	s.listMutex.Lock()
+	defer s.listMutex.Unlock()
+	if s.listCache == nil || time.Now().After(s.listExpiration) {
+		s.listExpiration = time.Now().Add(s.listDuration)
+		s.listCache = s.list(ctx)
 	}
-	for _, publisher := range publishers {
-		ctx := slog.With(ctx, slog.F("publisher", publisher))
-		dir := filepath.Join(s.extdir, publisher)
+	return s.listCache
+}
 
-		extensions, err := s.getDirNames(ctx, dir)
-		if err != nil {
-			s.logger.Error(ctx, "Error reading extensions", slog.Error(err))
-		}
-		for _, extension := range extensions {
-			ctx := slog.With(ctx, slog.F("extension", extension))
-			versions, err := s.Versions(ctx, publisher, extension)
-			if err != nil {
-				s.logger.Error(ctx, "Error reading versions", slog.Error(err))
-			}
-			if len(versions) == 0 {
-				continue
-			}
-
-			// The manifest from the latest version is used for filtering.
-			manifest, err := s.Manifest(ctx, publisher, extension, versions[0])
-			if err != nil {
-				s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err))
-				continue
-			}
-
-			if err = fn(manifest, versions); err != nil {
-				return err
-			}
+func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error {
+	// Walking through directories on disk and parsing manifest files takes several
+	// minutes with 1000+ extensions installed, so if we already did that within
+	// a specified duration, just load extensions from the cache instead.
+	for _, extension := range s.listWithCache(ctx) {
+		if err := fn(extension.manifest, extension.versions); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -333,13 +333,6 @@ func (s *Artifactory) RemoveExtension(ctx context.Context, publisher, name strin
 	return err
 }
 
-type extension struct {
-	manifest  *VSIXManifest
-	name      string
-	publisher string
-	versions  []Version
-}
-
 func (s *Artifactory) listWithCache(ctx context.Context) *[]ArtifactoryFile {
 	s.listMutex.Lock()
 	defer s.listMutex.Unlock()
