@@ -123,10 +123,11 @@ type VSIXAsset struct {
 }
 
 type Options struct {
-	Artifactory string
-	ExtDir      string
-	Repo        string
-	Logger      slog.Logger
+	Artifactory       string
+	ExtDir            string
+	Repo              string
+	Logger            slog.Logger
+	ListCacheDuration time.Duration
 }
 
 type extension struct {
@@ -245,14 +246,17 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 			return nil, xerrors.Errorf("the %s environment variable must be set", ArtifactoryTokenEnvKey)
 		}
 		return NewArtifactoryStorage(ctx, &ArtifactoryOptions{
-			ListCacheDuration: time.Minute,
+			ListCacheDuration: options.ListCacheDuration,
 			Logger:            options.Logger,
 			Repo:              options.Repo,
 			Token:             token,
 			URI:               options.Artifactory,
 		})
 	} else if options.ExtDir != "" {
-		return NewLocalStorage(options.ExtDir, options.Logger)
+		return NewLocalStorage(&LocalOptions{
+			ListCacheDuration: options.ListCacheDuration,
+			ExtDir:            options.ExtDir,
+		}, options.Logger)
 	}
 	return nil, xerrors.Errorf("must provide an Artifactory repository or local directory")
 }

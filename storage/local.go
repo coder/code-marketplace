@@ -26,8 +26,15 @@ type Local struct {
 	logger         slog.Logger
 }
 
-func NewLocalStorage(extdir string, logger slog.Logger) (*Local, error) {
-	extdir, err := filepath.Abs(extdir)
+type LocalOptions struct {
+	// How long to cache list responses.  Zero means no cache.  Manifests are
+	// currently cached indefinitely since they do not change.
+	ListCacheDuration time.Duration
+	ExtDir            string
+}
+
+func NewLocalStorage(options *LocalOptions, logger slog.Logger) (*Local, error) {
+	extdir, err := filepath.Abs(options.ExtDir)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +42,7 @@ func NewLocalStorage(extdir string, logger slog.Logger) (*Local, error) {
 		// TODO: Eject the cache when adding/removing extensions and/or add a
 		// command to eject the cache?
 		extdir:       extdir,
-		listDuration: time.Minute, // TODO: Make duration configurable
+		listDuration: options.ListCacheDuration,
 		logger:       logger,
 	}, nil
 }
@@ -181,7 +188,7 @@ func (s *Local) listWithCache(ctx context.Context) []extension {
 
 func (s *Local) WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error {
 	// Walking through directories on disk and parsing manifest files takes several
-	// minutes with 1000+ extensions installed, so if we already did that within
+	// minutes with many extensions installed, so if we already did that within
 	// a specified duration, just load extensions from the cache instead.
 	for _, extension := range s.listWithCache(ctx) {
 		if err := fn(extension.manifest, extension.versions); err != nil {
