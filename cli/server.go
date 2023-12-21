@@ -23,10 +23,11 @@ import (
 
 func server() *cobra.Command {
 	var (
-		address     string
-		artifactory string
-		extdir      string
-		repo        string
+		address           string
+		artifactory       string
+		extdir            string
+		repo              string
+		listcacheduration time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -53,10 +54,11 @@ func server() *cobra.Command {
 			}
 
 			store, err := storage.NewStorage(ctx, &storage.Options{
-				Artifactory: artifactory,
-				ExtDir:      extdir,
-				Logger:      logger,
-				Repo:        repo,
+				Artifactory:       artifactory,
+				ExtDir:            extdir,
+				Logger:            logger,
+				Repo:              repo,
+				ListCacheDuration: listcacheduration,
 			})
 			if err != nil {
 				return err
@@ -137,6 +139,7 @@ func server() *cobra.Command {
 	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
 	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 	cmd.Flags().StringVar(&address, "address", "127.0.0.1:3001", "The address on which to serve the marketplace API.")
+	cmd.Flags().DurationVar(&listcacheduration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
 
 	return cmd
 }

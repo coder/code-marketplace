@@ -15,7 +15,7 @@ import (
 func localFactory(t *testing.T) testStorage {
 	extdir := t.TempDir()
 	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
-	s, err := storage.NewLocalStorage(extdir, logger)
+	s, err := storage.NewLocalStorage(&storage.LocalOptions{ExtDir: extdir}, logger)
 	require.NoError(t, err)
 	return testStorage{
 		storage: s,
