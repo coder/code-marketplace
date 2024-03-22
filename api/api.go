@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 
 	"cdr.dev/slog"
 	"github.com/coder/code-marketplace/api/httpapi"
@@ -74,16 +73,8 @@ func New(options *Options) *API {
 
 	r := chi.NewRouter()
 
-	cors := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"POST", "GET", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	})
-
 	r.Use(
-		cors.Handler,
+		httpmw.Cors(),
 		httpmw.RateLimitPerMinute(options.RateLimit),
 		middleware.GetHead,
 		httpmw.AttachRequestID,
