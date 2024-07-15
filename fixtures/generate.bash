@@ -121,7 +121,7 @@ mock changelog
 EOF
       cp "$dir/icon.png" "$dest/extension/images/icon.png"
       pushd "$dest" >/dev/null
-      rm "$publisher.$name@$version.vsix"
+      rm -f "$publisher.$name@$version.vsix"
       zip -r "$publisher.$name@$version.vsix" * -q
       popd >/dev/null
     done < "$dir/versions"
