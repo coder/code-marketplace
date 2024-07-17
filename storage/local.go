@@ -27,7 +27,7 @@ type Local struct {
 }
 
 type LocalOptions struct {
-	// How long to cache the list of extensions with their manifests.  Zero means 
+	// How long to cache the list of extensions with their manifests.  Zero means
 	// no cache.
 	ListCacheDuration time.Duration
 	ExtDir            string
