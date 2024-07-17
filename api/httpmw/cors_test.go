@@ -104,10 +104,14 @@ func TestCors(t *testing.T) {
 					// Should always set some kind of allowed origin, if allowed.
 					require.Equal(t, test.allowedOrigin, rw.Header().Get(httpmw.AccessControlAllowOriginHeader))
 
-					// OPTIONS should echo back the request method and headers and we
-					// should never get to our handler as the middleware short-circuits
-					// with a 200.
-					if method == http.MethodOptions {
+					// OPTIONS should echo back the request method and headers (if there
+					// is an origin header set) and we should never get to our handler as
+					// the middleware short-circuits with a 200.
+					if method == http.MethodOptions && test.origin == "" {
+						require.Equal(t, "", rw.Header().Get(httpmw.AccessControlAllowMethodsHeader))
+						require.Equal(t, "", rw.Header().Get(httpmw.AccessControlAllowHeadersHeader))
+						require.Equal(t, http.StatusOK, rw.Code)
+					} else if method == http.MethodOptions {
 						require.Equal(t, http.MethodGet, rw.Header().Get(httpmw.AccessControlAllowMethodsHeader))
 						require.Equal(t, test.allowedHeaders, rw.Header().Get(httpmw.AccessControlAllowHeadersHeader))
 						require.Equal(t, http.StatusOK, rw.Code)
