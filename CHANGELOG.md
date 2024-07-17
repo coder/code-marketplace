@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Default max page size is now 200.
+
+### Added
+
+- Added a flag --max-page-size to server subcommand to set the max page size.
+
 ## [2.1.0](https://github.com/coder/code-marketplace/releases/tag/v2.1.0) - 2023-12-21
 
 ### Changed
