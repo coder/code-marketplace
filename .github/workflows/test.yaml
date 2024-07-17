@@ -56,11 +56,7 @@ jobs:
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
       - name: Install gotestsum
-        uses: jaxxstorm/action-install-gh-release@v1.7.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          repo: gotestyourself/gotestsum
-          tag: v1.7.0
+        shell: bash
+        run: go install gotest.tools/gotestsum@latest
 
       - run: make test
