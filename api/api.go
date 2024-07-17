@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -14,6 +15,8 @@ import (
 	"github.com/coder/code-marketplace/database"
 	"github.com/coder/code-marketplace/storage"
 )
+
+const MaxPageSizeDefault int = 200
 
 // QueryRequest implements an untyped object.  It is the data sent to the API to
 // query for extensions.
@@ -55,20 +58,26 @@ type Options struct {
 	Database database.Database
 	Logger   slog.Logger
 	// Set to <0 to disable.
-	RateLimit int
-	Storage   storage.Storage
+	RateLimit   int
+	Storage     storage.Storage
+	MaxPageSize int
 }
 
 type API struct {
-	Database database.Database
-	Handler  http.Handler
-	Logger   slog.Logger
+	Database    database.Database
+	Handler     http.Handler
+	Logger      slog.Logger
+	MaxPageSize int
 }
 
 // New creates a new API server.
 func New(options *Options) *API {
 	if options.RateLimit == 0 {
 		options.RateLimit = 512
+	}
+
+	if options.MaxPageSize == 0 {
+		options.MaxPageSize = MaxPageSizeDefault
 	}
 
 	r := chi.NewRouter()
@@ -84,9 +93,10 @@ func New(options *Options) *API {
 	)
 
 	api := &API{
-		Database: options.Database,
-		Handler:  r,
-		Logger:   options.Logger,
+		Database:    options.Database,
+		Handler:     r,
+		Logger:      options.Logger,
+		MaxPageSize: options.MaxPageSize,
 	}
 
 	r.Get("/", func(rw http.ResponseWriter, r *http.Request) {
@@ -163,10 +173,10 @@ func (api *API) extensionQuery(rw http.ResponseWriter, r *http.Request) {
 		})
 	}
 	for _, filter := range query.Filters {
-		if filter.PageSize < 0 || filter.PageSize > 50 {
+		if filter.PageSize < 0 || filter.PageSize > api.MaxPageSize {
 			httpapi.Write(rw, http.StatusBadRequest, httpapi.ErrorResponse{
-				Message:   "Invalid page size",
-				Detail:    "Check that the page size is between zero and fifty",
+				Message:   "The page size must be between 0 and " + strconv.Itoa(api.MaxPageSize),
+				Detail:    "Contact an administrator to increase the page size",
 				RequestID: httpmw.RequestID(r),
 			})
 		}

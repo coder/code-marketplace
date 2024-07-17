@@ -28,6 +28,7 @@ func server() *cobra.Command {
 		extdir            string
 		repo              string
 		listcacheduration time.Duration
+		maxpagesize       int
 	)
 
 	cmd := &cobra.Command{
@@ -85,9 +86,10 @@ func server() *cobra.Command {
 
 			// Start the API server.
 			mapi := api.New(&api.Options{
-				Database: database,
-				Storage:  store,
-				Logger:   logger,
+				Database:    database,
+				Storage:     store,
+				Logger:      logger,
+				MaxPageSize: maxpagesize,
 			})
 			server := &http.Server{
 				Handler: mapi.Handler,
@@ -136,6 +138,7 @@ func server() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
+	cmd.Flags().IntVar(&maxpagesize, "max-page-size", api.MaxPageSizeDefault, "The maximum number of pages to request")
 	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
 	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 	cmd.Flags().StringVar(&address, "address", "127.0.0.1:3001", "The address on which to serve the marketplace API.")
