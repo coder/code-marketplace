@@ -169,8 +169,8 @@ func (api *API) extensionQuery(rw http.ResponseWriter, r *http.Request) {
 	for _, filter := range query.Filters {
 		if filter.PageSize < 0 || filter.PageSize > api.MaxPageSize {
 			httpapi.Write(rw, http.StatusBadRequest, httpapi.ErrorResponse{
-				Message:   "Invalid page size",
-				Detail:    "Check that the page size is between 0 and " + strconv.Itoa(api.MaxPageSize),
+				Message:   "The page size must be between 0 and " + strconv.Itoa(api.MaxPageSize),
+				Detail:    "Contact an administrator to increase the page size",
 				RequestID: httpmw.RequestID(r),
 			})
 		}

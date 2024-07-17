@@ -21,7 +21,7 @@ import (
 	"github.com/coder/code-marketplace/storage"
 )
 
-const maxPageSizeDefault int = 100
+const maxPageSizeDefault int = 200
 
 func server() *cobra.Command {
 	var (
