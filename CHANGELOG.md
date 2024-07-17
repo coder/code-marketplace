@@ -19,13 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0](https://github.com/coder/code-marketplace/releases/tag/v2.1.0) - 2023-12-21
 
-### Changed
-
-- The duration of the cache used when listing/searching extensions is now
-  configurable with `--list-cache-duration`. The default is still one minute.
-
 ### Added
 
+- New `server` sub-command flag `--list-cache-duration` for setting the duration
+  of the cache used when listing and searching extensions. The default is still
+  one minute.
 - Local storage will also use a cache for listing/searching extensions
   (previously only Artifactory storage used a cache).
 
