@@ -21,8 +21,6 @@ import (
 	"github.com/coder/code-marketplace/storage"
 )
 
-const maxPageSizeDefault int = 200
-
 func server() *cobra.Command {
 	var (
 		address           string
@@ -140,7 +138,7 @@ func server() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
-	cmd.Flags().IntVar(&maxpagesize, "max-page-size", maxPageSizeDefault, "The maximum number of pages to request")
+	cmd.Flags().IntVar(&maxpagesize, "max-page-size", api.MaxPageSizeDefault, "The maximum number of pages to request")
 	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
 	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 	cmd.Flags().StringVar(&address, "address", "127.0.0.1:3001", "The address on which to serve the marketplace API.")

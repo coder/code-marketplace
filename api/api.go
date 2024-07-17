@@ -16,6 +16,8 @@ import (
 	"github.com/coder/code-marketplace/storage"
 )
 
+const MaxPageSizeDefault int = 200
+
 // QueryRequest implements an untyped object.  It is the data sent to the API to
 // query for extensions.
 // https://github.com/microsoft/vscode/blob/a69f95fdf3dc27511517eef5ff62b21c7a418015/src/vs/platform/extensionManagement/common/extensionGalleryService.ts#L338-L342
@@ -72,6 +74,10 @@ type API struct {
 func New(options *Options) *API {
 	if options.RateLimit == 0 {
 		options.RateLimit = 512
+	}
+
+	if options.MaxPageSize == 0 {
+		options.MaxPageSize = MaxPageSizeDefault
 	}
 
 	r := chi.NewRouter()

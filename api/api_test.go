@@ -119,8 +119,8 @@ func TestAPI(t *testing.T) {
 				}},
 			},
 			Response: &httpapi.ErrorResponse{
-				Message: "Invalid page size",
-				Detail:  "Check that the page size is between zero and fifty",
+				Message: "The page size must be between 0 and 200",
+				Detail:  "Contact an administrator to increase the page size",
 			},
 		},
 		{
@@ -255,9 +255,10 @@ func TestAPI(t *testing.T) {
 
 			logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}).Leveled(slog.LevelDebug)
 			apiServer := api.New(&api.Options{
-				Database: testutil.NewMockDB(exts),
-				Storage:  testutil.NewMockStorage(),
-				Logger:   logger,
+				Database:    testutil.NewMockDB(exts),
+				Storage:     testutil.NewMockStorage(),
+				Logger:      logger,
+				MaxPageSize: api.MaxPageSizeDefault,
 			})
 
 			server := httptest.NewServer(apiServer.Handler)
