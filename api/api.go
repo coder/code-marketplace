@@ -120,8 +120,13 @@ func New(options *Options) *API {
 	r.Get("/assets/{publisher}/{extension}/{version}/{type}", api.assetRedirect)
 
 	// This is the "download manually" URL, which like /assets is hardcoded and
-	// ignores the VSIX asset URL provided to VS Code in the response.
+	// ignores the VSIX asset URL provided to VS Code in the response.  We provide
+	// it at /publishers for backwards compatibility since that is where we
+	// originally had it, but VS Code appends to the service URL which means the
+	// path VS Code actually uses is /api/publishers.
+	// https://github.com/microsoft/vscode/blob/c727b5484ebfbeff1e1d29654cae5c17af1c826f/build/lib/extensions.ts#L228
 	r.Get("/publishers/{publisher}/vsextensions/{extension}/{version}/{type}", api.assetRedirect)
+	r.Get("/api/publishers/{publisher}/vsextensions/{extension}/{version}/{type}", api.assetRedirect)
 
 	// This is the URL you get taken to when you click the extension's names,
 	// ratings, etc from the extension details page.
