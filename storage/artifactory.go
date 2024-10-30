@@ -391,7 +391,7 @@ func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIX
 				return err
 			} else if err != nil {
 				id := ExtensionID(ext.publisher, ext.name, ext.versions[0].Version)
-				s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err),
+				s.logger.Error(ctx, "Unable to read extension manifest; extension will be ignored", slog.Error(err),
 					slog.F("id", id),
 					slog.F("targetPlatform", ext.versions[0].TargetPlatform))
 			} else {
@@ -405,6 +405,9 @@ func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIX
 		return err
 	}
 	for _, ext := range extensions {
+		if ext.manifest == nil {
+			continue
+		}
 		if err = fn(ext.manifest, ext.versions); err != nil {
 			return err
 		}
