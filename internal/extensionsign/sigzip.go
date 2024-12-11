@@ -3,6 +3,7 @@ package extensionsign
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/ed25519"
 	"encoding/json"
 
 	"golang.org/x/xerrors"
@@ -25,7 +26,10 @@ func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
 	return manifest, nil
 }
 
-func Zip(manifest SignatureManifest) ([]byte, error) {
+// SignAndZip signs a manifest and zips it up
+// Should be a PCKS8 key
+// TODO: Support other key types
+func SignAndZip(key ed25519.PrivateKey, manifest SignatureManifest) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -34,9 +38,38 @@ func Zip(manifest SignatureManifest) ([]byte, error) {
 		return nil, xerrors.Errorf("create manifest: %w", err)
 	}
 
-	err = json.NewEncoder(manFile).Encode(manifest)
+	manifestData, err := json.Marshal(manifest)
 	if err != nil {
 		return nil, xerrors.Errorf("encode manifest: %w", err)
+	}
+
+	_, err = manFile.Write(manifestData)
+	if err != nil {
+		return nil, xerrors.Errorf("write manifest: %w", err)
+	}
+
+	// Empty file
+	_, err = w.Create(".signature.p7s")
+	if err != nil {
+		return nil, xerrors.Errorf("create empty p7s signature: %w", err)
+	}
+
+	// Actual sig
+	sigFile, err := w.Create(".signature.sig")
+	if err != nil {
+		return nil, xerrors.Errorf("create signature: %w", err)
+	}
+
+	signature := ed25519.Sign(key, manifestData)
+
+	//signature, err := key.Sign(rand.Reader, manifestData, crypto.SHA512)
+	//if err != nil {
+	//	return nil, xerrors.Errorf("sign: %w", err)
+	//}
+
+	_, err = sigFile.Write(signature)
+	if err != nil {
+		return nil, xerrors.Errorf("write signature: %w", err)
 	}
 
 	err = w.Close()
