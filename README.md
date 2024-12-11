@@ -165,7 +165,13 @@ marketplace is running behind an https URL.
 Although not officially supported, you can follow the examples below to start using code-marketplace with VS Code and VSCodium:
 
 - [VS Code](https://github.com/eclipse/openvsx/wiki/Using-Open-VSX-in-VS-Code)
-- [VSCodium](https://github.com/VSCodium/vscodium/blob/master/DOCS.md#how-to-use-the-vs-code-marketplace)
+- [VSCodium](https://github.com/VSCodium/vscodium/blob/master/docs/index.md#howto-switch-marketplace)
+  ```
+    export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api
+    export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
+    # Or set a product.json file in `~/.config/VSCodium/product.json`
+    codium
+    ``` 
 
 ## Missing features
 
