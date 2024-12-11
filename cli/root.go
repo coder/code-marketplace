@@ -1,8 +1,9 @@
 package cli
 
 import (
-	"github.com/spf13/cobra"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 func Root() *cobra.Command {
@@ -16,7 +17,7 @@ func Root() *cobra.Command {
 		}, "\n"),
 	}
 
-	cmd.AddCommand(add(), remove(), server(), version())
+	cmd.AddCommand(add(), remove(), server(), version(), signature())
 
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 

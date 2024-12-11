@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
+	"github.com/coder/code-marketplace/internal/extensionsign"
 
 	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/util"
@@ -22,6 +24,7 @@ func add() *cobra.Command {
 		artifactory string
 		extdir      string
 		repo        string
+		signature   bool
 	)
 
 	cmd := &cobra.Command{
@@ -73,7 +76,7 @@ func add() *cobra.Command {
 					return err
 				}
 				for _, file := range files {
-					s, err := doAdd(ctx, filepath.Join(args[0], file.Name()), store)
+					s, err := doAdd(ctx, filepath.Join(args[0], file.Name()), signature, store)
 					if err != nil {
 						_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Failed to unpack %s: %s\n", file.Name(), err.Error())
 						failed = append(failed, file.Name())
@@ -82,7 +85,7 @@ func add() *cobra.Command {
 					}
 				}
 			} else {
-				s, err := doAdd(ctx, args[0], store)
+				s, err := doAdd(ctx, args[0], signature, store)
 				if err != nil {
 					return err
 				}
@@ -102,11 +105,12 @@ func add() *cobra.Command {
 	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
 	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
 	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
+	cmd.Flags().BoolVar(&signature, "signature", true, "Include signature")
 
 	return cmd
 }
 
-func doAdd(ctx context.Context, source string, store storage.Storage) ([]string, error) {
+func doAdd(ctx context.Context, source string, includeSignature bool, store storage.Storage) ([]string, error) {
 	// Read in the extension.  In the future we might support stdin as well.
 	vsix, err := storage.ReadVSIX(ctx, source)
 	if err != nil {
@@ -120,7 +124,31 @@ func doAdd(ctx context.Context, source string, store storage.Storage) ([]string,
 		return nil, err
 	}
 
-	location, err := store.AddExtension(ctx, manifest, vsix)
+	var extra []storage.File
+	if includeSignature {
+		sigManifest, err := extensionsign.GenerateSignatureManifest(vsix)
+		if err != nil {
+			return nil, xerrors.Errorf("generate signature manifest: %w", err)
+		}
+
+		data, err := json.Marshal(sigManifest)
+		if err != nil {
+			return nil, xerrors.Errorf("marshal signature manifest: %w", err)
+		}
+
+		extra = append(extra, storage.File{
+			RelativePath: "extension.sigzip",
+			Content:      data,
+		})
+
+		manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
+			Type:        storage.VSIXSignatureType,
+			Path:        "extension.sigzip",
+			Addressable: "true", // TODO: Idk if this is right
+		})
+	}
+
+	location, err := store.AddExtension(ctx, manifest, vsix, extra...)
 	if err != nil {
 		return nil, err
 	}

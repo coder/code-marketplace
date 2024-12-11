@@ -213,7 +213,7 @@ func (s *Artifactory) upload(ctx context.Context, endpoint string, r io.Reader) 
 	return code, nil
 }
 
-func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
+func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
 	dir := path.Join(identity.Publisher, identity.ID, Version{

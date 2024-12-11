@@ -112,6 +112,7 @@ type AssetType string
 const (
 	ManifestAssetType AssetType = "Microsoft.VisualStudio.Code.Manifest" // This is the package.json.
 	VSIXAssetType     AssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
+	VSIXSignatureType AssetType = "Microsoft.VisualStudio.Services.VsixSignature"
 )
 
 // VSIXAsset implements XMLManifest.PackageManifest.Assets.Asset.
@@ -203,8 +204,8 @@ func (vs ByVersion) Less(i, j int) bool {
 
 type Storage interface {
 	// AddExtension adds the provided VSIX into storage and returns the location
-	// for verification purposes.
-	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error)
+	// for verification purposes. Extra files can be included, but not required.
+	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error)
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
 	FileServer() http.Handler
@@ -228,6 +229,11 @@ type Storage interface {
 	// [0]).  If the function returns an error the error is immediately returned
 	// which aborts the walk.
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error
+}
+
+type File struct {
+	RelativePath string
+	Content      []byte
 }
 
 const ArtifactoryTokenEnvKey = "ARTIFACTORY_TOKEN"

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"cdr.dev/slog"
 )
 
@@ -89,7 +91,7 @@ func (s *Local) list(ctx context.Context) []extension {
 	return list
 }
 
-func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
+func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
 	dir := filepath.Join(s.extdir, identity.Publisher, identity.ID, Version{
@@ -119,6 +121,18 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	err = os.WriteFile(vsixPath, vsix, 0o644)
 	if err != nil {
 		return "", err
+	}
+
+	for _, file := range extra {
+		path := filepath.Join(dir, file.RelativePath)
+		err := os.MkdirAll(filepath.Dir(path), 0o644)
+		if err != nil {
+			return "", err
+		}
+		err = os.WriteFile(path, file.Content, 0o644)
+		if err != nil {
+			return dir, xerrors.Errorf("write extra file %q: %w", path, err)
+		}
 	}
 
 	return dir, nil
