@@ -167,6 +167,7 @@ Although not officially supported, you can follow the examples below to start us
 - [VS Code](https://github.com/eclipse/openvsx/wiki/Using-Open-VSX-in-VS-Code)
 - [VSCodium](https://github.com/VSCodium/vscodium/blob/master/docs/index.md#howto-switch-marketplace)
   - ```
+    # Or set a product.json file in `~/.config/VSCodium/product.json`
     export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api
     export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
     codium
