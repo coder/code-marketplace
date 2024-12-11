@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -131,14 +130,14 @@ func doAdd(ctx context.Context, source string, includeSignature bool, store stor
 			return nil, xerrors.Errorf("generate signature manifest: %w", err)
 		}
 
-		data, err := json.Marshal(sigManifest)
+		zipped, err := extensionsign.Zip(sigManifest)
 		if err != nil {
-			return nil, xerrors.Errorf("marshal signature manifest: %w", err)
+			return nil, xerrors.Errorf("zip signature manifest: %w", err)
 		}
 
 		extra = append(extra, storage.File{
 			RelativePath: "extension.sigzip",
-			Content:      data,
+			Content:      zipped,
 		})
 
 		manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
