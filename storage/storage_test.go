@@ -132,6 +132,14 @@ func TestStorage(t *testing.T) {
 			name:    "Artifactory",
 			factory: artifactoryFactory,
 		},
+		//{
+		//	name:    "SignedLocal",
+		//	factory: signed(localFactory),
+		//},
+		//{
+		//	name:    "SignedArtifactory",
+		//	factory: signed(artifactoryFactory),
+		//},
 	}
 	for _, sf := range factories {
 		t.Run(sf.name, func(t *testing.T) {

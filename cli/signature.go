@@ -13,6 +13,7 @@ import (
 func signature() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "signature",
+		Short:   "Commands for debugging and working with signatures.",
 		Hidden:  true, // Debugging tools
 		Aliases: []string{"sig", "sigs", "signatures"},
 	}

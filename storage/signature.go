@@ -21,6 +21,7 @@ const (
 	sigManifestName = ".signature.manifest"
 )
 
+// Signature is a storage wrapper that can sign extensions on demand.
 type Signature struct {
 	// Signer if provided, will be used to sign extensions. If not provided,
 	// no extensions will be signed.

@@ -13,6 +13,7 @@ import (
 	"github.com/coder/code-marketplace/storage/easyzip"
 )
 
+// SignatureManifest should be serialized to JSON before being signed.
 type SignatureManifest struct {
 	Package File
 	// Entries is base64(filepath) -> File
