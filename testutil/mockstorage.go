@@ -27,7 +27,7 @@ func (s *MockStorage) AddExtension(ctx context.Context, manifest *storage.VSIXMa
 	return "", errors.New("not implemented")
 }
 func (s *MockStorage) Open(ctx context.Context, path string) (fs.File, error) {
-	if filepath.Base(path) == "/nonexistent" {
+	if filepath.Base(path) == "nonexistent" {
 		return nil, fs.ErrNotExist
 	}
 

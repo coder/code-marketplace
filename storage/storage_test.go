@@ -104,11 +104,13 @@ func TestNewStorage(t *testing.T) {
 				require.Error(t, err)
 				require.Regexp(t, test.error, err.Error())
 			} else if test.local {
-				_, ok := s.(*storage.Local)
+				under := s.(*storage.Signature)
+				_, ok := under.Storage.(*storage.Local)
 				require.True(t, ok)
 				require.NoError(t, err)
 			} else {
-				_, ok := s.(*storage.Artifactory)
+				under := s.(*storage.Signature)
+				_, ok := under.Storage.(*storage.Artifactory)
 				require.True(t, ok)
 				require.NoError(t, err)
 			}
