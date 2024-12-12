@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/coder/code-marketplace/internal/extensionsign"
+	"github.com/coder/code-marketplace/extensionsign"
 )
 
 var _ Storage = (*Signature)(nil)

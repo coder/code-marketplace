@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/xerrors"
 
-	"github.com/coder/code-marketplace/internal/extensionsign"
+	"github.com/coder/code-marketplace/extensionsign"
 )
 
 func signature() *cobra.Command {
