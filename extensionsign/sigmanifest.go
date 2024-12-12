@@ -27,25 +27,25 @@ func (a SignatureManifest) String() string {
 // Equal is helpful for debugging to know if two manifests are equal.
 // They can change if any file is removed/added/edited to an extension.
 func (a SignatureManifest) Equal(b SignatureManifest) error {
-	var errs error
+	var errs []error
 	if err := a.Package.Equal(b.Package); err != nil {
-		errs = errors.Join(errs, xerrors.Errorf("package: %w", err))
+		errs = append(errs, xerrors.Errorf("package: %w", err))
 	}
 
 	if len(a.Entries) != len(b.Entries) {
-		errs = errors.Join(errs, xerrors.Errorf("entry count mismatch: %d != %d", len(a.Entries), len(b.Entries)))
+		errs = append(errs, xerrors.Errorf("entry count mismatch: %d != %d", len(a.Entries), len(b.Entries)))
 	}
 
 	for k, v := range a.Entries {
 		if _, ok := b.Entries[k]; !ok {
-			errs = errors.Join(errs, xerrors.Errorf("entry %q not found in second set", k))
+			errs = append(errs, xerrors.Errorf("entry %q not found in second set", k))
 			continue
 		}
 		if err := v.Equal(b.Entries[k]); err != nil {
-			err = errors.Join(err, xerrors.Errorf("entry %q: %w", k, err))
+			errs = append(errs, xerrors.Errorf("entry %q: %w", k, err))
 		}
 	}
-	return errs
+	return errors.Join(errs...)
 }
 
 type File struct {
