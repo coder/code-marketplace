@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/coder/code-marketplace/storage"
@@ -25,6 +26,8 @@ type testStorage struct {
 	storage storage.Storage
 	write   func(content []byte, elem ...string)
 	exists  func(elem ...string) bool
+
+	expectedManifest func(man *storage.VSIXManifest)
 }
 type storageFactory = func(t *testing.T) testStorage
 
@@ -132,14 +135,14 @@ func TestStorage(t *testing.T) {
 			name:    "Artifactory",
 			factory: artifactoryFactory,
 		},
-		//{
-		//	name:    "SignedLocal",
-		//	factory: signed(localFactory),
-		//},
-		//{
-		//	name:    "SignedArtifactory",
-		//	factory: signed(artifactoryFactory),
-		//},
+		{
+			name:    "SignedLocal",
+			factory: signed(true, localFactory),
+		},
+		{
+			name:    "SignedArtifactory",
+			factory: signed(true, artifactoryFactory),
+		},
 	}
 	for _, sf := range factories {
 		t.Run(sf.name, func(t *testing.T) {
@@ -332,7 +335,12 @@ func testManifest(t *testing.T, factory storageFactory) {
 					Path:        fmt.Sprintf("%s.%s-%s.vsix", test.extension.Publisher, test.extension.Name, test.version),
 					Addressable: "true",
 				})
-				require.Equal(t, test.expected, manifest)
+				if f.expectedManifest != nil {
+					f.expectedManifest(test.expected)
+				}
+				if !assert.Equal(t, test.expected, manifest) {
+					fmt.Println("Asd")
+				}
 			}
 		})
 	}

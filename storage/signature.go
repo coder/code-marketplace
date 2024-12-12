@@ -17,7 +17,7 @@ import (
 var _ Storage = (*Signature)(nil)
 
 const (
-	sigzipFilename  = "extension.sigzip"
+	SigzipFilename  = "extension.sigzip"
 	sigManifestName = ".signature.manifest"
 )
 
@@ -67,17 +67,24 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 	}
 
 	if s.SigningEnabled() {
+		for _, asset := range manifest.Assets.Asset {
+			if asset.Path == SigzipFilename {
+				// Already signed
+				return manifest, nil
+			}
+		}
 		manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 			Type:        VSIXSignatureType,
-			Path:        sigzipFilename,
+			Path:        SigzipFilename,
 			Addressable: "true",
 		})
+		return manifest, nil
 	}
 	return manifest, nil
 }
 
 // Open will intercept requests for signed extensions payload.
-// It does this by looking for 'sigzipFilename' or p7s.sig.
+// It does this by looking for 'SigzipFilename' or p7s.sig.
 //
 // The signed payload and signing process is taken from:
 // https://github.com/filiptronicek/node-ovsx-sign
@@ -98,7 +105,7 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 //     source implementation. Ideally this marketplace would match Microsoft's
 //     marketplace API.
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
-	if s.SigningEnabled() && filepath.Base(fp) == sigzipFilename {
+	if s.SigningEnabled() && filepath.Base(fp) == SigzipFilename {
 		// hijack this request, sign the sig manifest
 		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
 		if err != nil {
@@ -119,7 +126,7 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
 		}
 
-		f := mem.NewFileHandle(mem.CreateFile(sigzipFilename))
+		f := mem.NewFileHandle(mem.CreateFile(SigzipFilename))
 		_, err = f.Write(signed)
 		return f, err
 	}
