@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"crypto"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,17 +23,21 @@ const (
 )
 
 type Signature struct {
-	// SignDesignExtensions is a flag that determines if the signature should
-	// include the extension payloads.
-	signExtensions bool
+	// Signer if provided, will be used to sign extensions. If not provided,
+	// no extensions will be signed.
+	Signer crypto.Signer
 	Storage
 }
 
-func NewSignatureStorage(signExtensions bool, s Storage) *Signature {
+func NewSignatureStorage(signer crypto.Signer, s Storage) *Signature {
 	return &Signature{
-		signExtensions: signExtensions,
-		Storage:        s,
+		Signer:  signer,
+		Storage: s,
 	}
+}
+
+func (s *Signature) SigningEnabled() bool {
+	return s.Signer != nil
 }
 
 // AddExtension includes the signature manifest of the vsix. Signing happens on
@@ -61,7 +66,7 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 		return nil, err
 	}
 
-	if s.signExtensions {
+	if s.SigningEnabled() {
 		manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 			Type:        VSIXSignatureType,
 			Path:        sigzipFilename,
@@ -72,11 +77,11 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 }
 
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
-	if s.signExtensions && filepath.Base(fp) == "p7s.sig" {
+	if s.SigningEnabled() && filepath.Base(fp) == "p7s.sig" {
 		// This file must exist, and it is always empty
 		return mem.NewFileHandle(mem.CreateFile("p7s.sig")), nil
 	}
-	if s.signExtensions && filepath.Base(fp) == sigzipFilename {
+	if s.SigningEnabled() && filepath.Base(fp) == sigzipFilename {
 		// hijack this request, sign the sig manifest
 		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
 		if err != nil {
@@ -85,13 +90,12 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 		}
 		defer manifest.Close()
 
-		key, _ := extensionsign.GenerateKey()
 		manifestData, err := io.ReadAll(manifest)
 		if err != nil {
 			return nil, xerrors.Errorf("read signature manifest: %w", err)
 		}
 
-		signed, err := extensionsign.SignAndZipManifest(key, manifestData)
+		signed, err := extensionsign.SignAndZipManifest(s.Signer, manifestData)
 		if err != nil {
 			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
 		}

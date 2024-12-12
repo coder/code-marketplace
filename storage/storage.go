@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"crypto"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -127,7 +128,7 @@ type VSIXAsset struct {
 }
 
 type Options struct {
-	SignExtensions    bool
+	Signer            crypto.Signer
 	Artifactory       string
 	ExtDir            string
 	Repo              string
@@ -292,7 +293,7 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 		return nil, err
 	}
 
-	return NewSignatureStorage(options.SignExtensions, store), nil
+	return NewSignatureStorage(options.Signer, store), nil
 }
 
 // ReadVSIXManifest reads and parses an extension manifest from a vsix file.  If

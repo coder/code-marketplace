@@ -15,6 +15,7 @@ import (
 
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
+	"github.com/coder/code-marketplace/extensionsign"
 
 	"github.com/coder/code-marketplace/api"
 	"github.com/coder/code-marketplace/database"
@@ -23,12 +24,14 @@ import (
 
 func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 	opts = &storage.Options{}
+	var sign bool
 	return func(cmd *cobra.Command) {
 		cmd.Flags().StringVar(&opts.ExtDir, "extensions-dir", "", "The path to extensions.")
 		cmd.Flags().StringVar(&opts.Artifactory, "artifactory", "", "Artifactory server URL.")
 		cmd.Flags().StringVar(&opts.Repo, "repo", "", "Artifactory repository.")
 		cmd.Flags().DurationVar(&opts.ListCacheDuration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
-		cmd.Flags().BoolVar(&opts.SignExtensions, "sign", false, "Sign extensions.")
+		cmd.Flags().BoolVar(&sign, "sign", false, "Sign extensions.")
+		_ = cmd.Flags().MarkHidden("sign") // This flag needs to import a key, not just be a bool
 
 		var before func(cmd *cobra.Command, args []string) error
 		if cmd.PreRunE != nil {
@@ -46,6 +49,9 @@ func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 			opts.Logger = cmdLogger(cmd)
 			if before != nil {
 				return before(cmd, args)
+			}
+			if sign { // TODO: Remove this for an actual key import
+				opts.Signer, _ = extensionsign.GenerateKey()
 			}
 			return nil
 		}
