@@ -189,7 +189,7 @@ func testFileServer(t *testing.T, factory storageFactory) {
 			req := httptest.NewRequest("GET", test.path, nil)
 			rec := httptest.NewRecorder()
 
-			server := f.storage.FileServer()
+			server := storage.HTTPFileServer(f.storage)
 			server.ServeHTTP(rec, req)
 
 			resp := rec.Result()

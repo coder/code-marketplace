@@ -237,6 +237,17 @@ type Storage interface {
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error
 }
 
+// HTTPFileServer creates an http.Handler that serves files from the provided
+// storage.
+func HTTPFileServer(s Storage) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		http.FileServerFS(&contextFs{
+			ctx:  r.Context(),
+			open: s.Open,
+		}).ServeHTTP(rw, r)
+	})
+}
+
 type File struct {
 	RelativePath string
 	Content      []byte
@@ -428,4 +439,13 @@ func ParseExtensionID(id string) (string, string, string, error) {
 		return "", "", "", xerrors.Errorf("\"%s\" does not match <publisher>.<name> or <publisher>.<name>@<version>", id)
 	}
 	return match[0][1], match[0][2], match[0][3], nil
+}
+
+type contextFs struct {
+	ctx  context.Context
+	open func(ctx context.Context, name string) (fs.File, error)
+}
+
+func (c *contextFs) Open(name string) (fs.File, error) {
+	return c.open(c.ctx, name)
 }

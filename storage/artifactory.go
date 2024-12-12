@@ -11,12 +11,12 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/spf13/afero/mem"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -300,10 +300,13 @@ func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
 		}
 	}
 
-	return artifactoryFile{
-		Response: resp,
-		path:     fp,
-	}, nil
+	f := mem.NewFileHandle(mem.CreateFile(fp))
+	_, err = io.Copy(f, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, nil
 }
 
 func (s *Artifactory) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
@@ -452,21 +455,3 @@ func (s *Artifactory) Versions(ctx context.Context, publisher, name string) ([]V
 	sort.Sort(ByVersion(versions))
 	return versions, nil
 }
-
-var _ fs.File = (*artifactoryFile)(nil)
-var _ fs.FileInfo = (*artifactoryFile)(nil)
-
-type artifactoryFile struct {
-	*http.Response
-	path string
-}
-
-func (a artifactoryFile) Name() string               { return filepath.Base(a.path) }
-func (a artifactoryFile) Size() int64                { return a.Response.ContentLength }
-func (a artifactoryFile) Mode() fs.FileMode          { return fs.FileMode(0) } // ?
-func (a artifactoryFile) ModTime() time.Time         { return time.Now() }
-func (a artifactoryFile) IsDir() bool                { return false }
-func (a artifactoryFile) Sys() any                   { return nil }
-func (a artifactoryFile) Stat() (fs.FileInfo, error) { return a, nil }
-func (a artifactoryFile) Read(i []byte) (int, error) { return a.Response.Body.Read(i) }
-func (a artifactoryFile) Close() error               { return a.Response.Body.Close() }
