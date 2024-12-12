@@ -17,7 +17,7 @@ func NewMockStorage() *MockStorage {
 	return &MockStorage{}
 }
 
-func (s *MockStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte, extra ...storage.File) (string, error) {
+func (s *MockStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte) (string, error) {
 	return "", errors.New("not implemented")
 }
 

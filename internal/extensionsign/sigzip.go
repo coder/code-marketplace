@@ -26,10 +26,18 @@ func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
 	return manifest, nil
 }
 
+func SignAndZipVSIX(key ed25519.PrivateKey, vsix []byte) ([]byte, error) {
+	manifest, err := GenerateSignatureManifest(vsix)
+	if err != nil {
+		return nil, xerrors.Errorf("generate manifest: %w", err)
+	}
+	return SignAndZipManifest(key, manifest)
+}
+
 // SignAndZip signs a manifest and zips it up
 // Should be a PCKS8 key
 // TODO: Support other key types
-func SignAndZip(key ed25519.PrivateKey, manifest SignatureManifest) ([]byte, error) {
+func SignAndZipManifest(key ed25519.PrivateKey, manifest SignatureManifest) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 

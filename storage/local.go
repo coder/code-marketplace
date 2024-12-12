@@ -164,6 +164,12 @@ func (s *Local) Manifest(ctx context.Context, publisher, name string, version Ve
 		Addressable: "true",
 	})
 
+	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
+		Type:        VSIXSignatureType,
+		Path:        "extension.sigzip",
+		Addressable: "true",
+	})
+
 	return manifest, nil
 }
 
