@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"crypto"
+	"crypto/x509"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -13,7 +14,10 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+<<<<<<< HEAD
 
+=======
+>>>>>>> 13a5775 (chore: more work towards supporting p7s)
 	"github.com/coder/code-marketplace/extensionsign"
 )
 
@@ -32,19 +36,38 @@ func SignatureZipFilename(manifest *VSIXManifest) string {
 type Signature struct {
 	// Signer if provided, will be used to sign extensions. If not provided,
 	// no extensions will be signed.
-	Signer crypto.Signer
-	Logger slog.Logger
+	Signer       crypto.Signer
+	Certificates []*x509.Certificate
+	Logger       slog.Logger
 	// SaveSigZips is a flag that will save the signed extension to disk.
 	// This is useful for debugging, but the server will never use this file.
 	saveSigZips bool
 	Storage
 }
 
-func NewSignatureStorage(logger slog.Logger, signer crypto.Signer, s Storage) *Signature {
-	return &Signature{
-		Signer:  signer,
-		Storage: s,
+func NewSignatureStorage(logger slog.Logger, signer crypto.Signer, certs []*x509.Certificate, s Storage) (*Signature, error) {
+	// TODO: We should check if the certs include the public key from the signer. If they do not,
+	// A cert is probably missing.
+	st := &Signature{
+		Logger:       logger,
+		Signer:       signer,
+		Certificates: certs,
+		Storage:      s,
 	}
+	if !st.SigningEnabled() {
+		return st, nil
+	}
+
+	// Attempt to sign something to ensure certs/keys are correct and supported
+	_, err := extensionsign.SigningAlgorithm([]byte("testing configuration"), certs, signer)
+	if err != nil {
+		return nil, xerrors.Errorf("extension signer: %w", err)
+	}
+
+	if st.SigningEnabled() {
+		logger.Info(context.Background(), "signing of extensions is enabled")
+	}
+	return st, nil
 }
 
 func (s *Signature) SaveSigZips() {
@@ -145,6 +168,7 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 			// If this file is missing, it means the extension was added before
 			// signatures were handled by the marketplace.
 			// TODO: Generate the sig manifest payload and insert it?
+			s.Logger.Error(ctx, "signature manifest not found", slog.Error(err))
 			return nil, xerrors.Errorf("open signature manifest: %w", err)
 		}
 		defer manifest.Close()
@@ -171,6 +195,7 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 		// TODO: Fetch the VSIX payload from the storage
 		signed, err := s.SigZip(ctx, vsixData, manifestData)
 		if err != nil {
+			s.Logger.Error(ctx, "signing manifest", slog.Error(err))
 			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
 		}
 

@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"crypto"
+	"crypto/x509"
 	"testing"
 
 	"cdr.dev/slog"
@@ -28,6 +29,8 @@ func signed(signer bool, factory func(t *testing.T) testStorage) func(t *testing
 			exp = expectSignature
 		}
 
+		sst, err := storage.NewSignatureStorage(slog.Make(), key, []*x509.Certificate{}, st.storage)
+		require.NoError(t, err)
 		return testStorage{
 			storage:          storage.NewSignatureStorage(slog.Make(), key, st.storage),
 			write:            st.write,

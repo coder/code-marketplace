@@ -16,6 +16,7 @@ import (
 
 func add() *cobra.Command {
 	addFlags, opts := serverFlags()
+
 	cmd := &cobra.Command{
 		Use:   "add <source>",
 		Short: "Add an extension to the marketplace",
