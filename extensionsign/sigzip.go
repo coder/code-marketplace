@@ -55,7 +55,7 @@ func SignAndZipManifest(secret crypto.Signer, manifest json.RawMessage) ([]byte,
 		return nil, xerrors.Errorf("create signature: %w", err)
 	}
 
-	signature, err := secret.Sign(rand.Reader, manifest, nil)
+	signature, err := secret.Sign(rand.Reader, manifest, crypto.Hash(0))
 	if err != nil {
 		return nil, xerrors.Errorf("sign: %w", err)
 	}

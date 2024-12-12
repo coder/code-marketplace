@@ -1,14 +1,14 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
-	"time"
 
+	"github.com/spf13/afero/mem"
 	"golang.org/x/xerrors"
 
 	"github.com/coder/code-marketplace/extensionsign"
@@ -68,16 +68,20 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 			Addressable: "true",
 		})
 	}
-
 	return manifest, nil
 }
 
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
+	if s.signExtensions && filepath.Base(fp) == "p7s.sig" {
+		// This file must exist, and it is always empty
+		return mem.NewFileHandle(mem.CreateFile("p7s.sig")), nil
+	}
 	if s.signExtensions && filepath.Base(fp) == sigzipFilename {
 		// hijack this request, sign the sig manifest
-		manifest, err := s.Storage.Open(ctx, sigManifestName)
+		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
 		if err != nil {
-			return nil, err
+			fmt.Println(err)
+			return nil, xerrors.Errorf("open signature manifest: %w", err)
 		}
 		defer manifest.Close()
 
@@ -91,23 +95,11 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 		if err != nil {
 			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
 		}
-		return memFile{data: bytes.NewBuffer(signed), name: sigzipFilename}, nil
+
+		f := mem.NewFileHandle(mem.CreateFile(sigzipFilename))
+		_, err = f.Write(signed)
+		return f, err
 	}
 
 	return s.Storage.Open(ctx, fp)
 }
-
-type memFile struct {
-	data *bytes.Buffer
-	name string
-}
-
-func (a memFile) Name() string               { return a.name }
-func (a memFile) Size() int64                { return int64(a.data.Len()) }
-func (a memFile) Mode() fs.FileMode          { return fs.FileMode(0) } // ?
-func (a memFile) ModTime() time.Time         { return time.Now() }
-func (a memFile) IsDir() bool                { return false }
-func (a memFile) Sys() any                   { return nil }
-func (a memFile) Stat() (fs.FileInfo, error) { return a, nil }
-func (a memFile) Read(i []byte) (int, error) { return a.data.Read(i) }
-func (a memFile) Close() error               { return nil }

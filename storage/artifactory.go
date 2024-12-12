@@ -453,15 +453,6 @@ func (s *Artifactory) Versions(ctx context.Context, publisher, name string) ([]V
 	return versions, nil
 }
 
-type contextFs struct {
-	ctx  context.Context
-	open func(ctx context.Context, name string) (fs.File, error)
-}
-
-func (c *contextFs) Open(name string) (fs.File, error) {
-	return c.open(c.ctx, name)
-}
-
 var _ fs.File = (*artifactoryFile)(nil)
 var _ fs.FileInfo = (*artifactoryFile)(nil)
 
