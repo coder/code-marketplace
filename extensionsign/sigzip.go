@@ -28,7 +28,6 @@ func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
 }
 
 // SignAndZipManifest signs a manifest and zips it up
-// Sign
 func SignAndZipManifest(secret crypto.Signer, manifest json.RawMessage) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)

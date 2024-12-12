@@ -23,7 +23,8 @@ func (a SignatureManifest) String() string {
 	return fmt.Sprintf("Package %q with Entries: %d", a.Package.Digests.SHA256, len(a.Entries))
 }
 
-// Equal is helpful for debugging
+// Equal is helpful for debugging to know if two manifests are equal.
+// They can change if any file is removed/added/edited to an extension.
 func (a SignatureManifest) Equal(b SignatureManifest) error {
 	var err error
 	if err := a.Package.Equal(b.Package); err != nil {
@@ -82,7 +83,8 @@ type Digests struct {
 }
 
 // GenerateSignatureManifest generates a signature manifest for a VSIX file.
-// It does not sign the manifest.
+// It does not sign the manifest. The manifest is the base64 encoded file path
+// followed by the sha256 hash of the file, and it's size.
 func GenerateSignatureManifest(vsixFile []byte) (SignatureManifest, error) {
 	pkgManifest, err := FileManifest(bytes.NewReader(vsixFile))
 	if err != nil {

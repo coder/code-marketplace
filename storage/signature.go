@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
@@ -76,16 +75,24 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 	return manifest, nil
 }
 
+// Open will intercept requests for signed extensions payload.
+// It does this by looking for 'sigzipFilename' or p7s.sig.
+//
+// The signed payload and signing process is taken from:
+// https://github.com/filiptronicek/node-ovsx-sign
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 	if s.SigningEnabled() && filepath.Base(fp) == "p7s.sig" {
 		// This file must exist, and it is always empty
 		return mem.NewFileHandle(mem.CreateFile("p7s.sig")), nil
 	}
+
 	if s.SigningEnabled() && filepath.Base(fp) == sigzipFilename {
 		// hijack this request, sign the sig manifest
 		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
 		if err != nil {
-			fmt.Println(err)
+			// If this file is missing, it means the extension was added before
+			// signatures were handled by the marketplace.
+			// TODO: Generate the sig manifest payload and insert it?
 			return nil, xerrors.Errorf("open signature manifest: %w", err)
 		}
 		defer manifest.Close()
