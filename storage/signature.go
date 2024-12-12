@@ -80,12 +80,23 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 //
 // The signed payload and signing process is taken from:
 // https://github.com/filiptronicek/node-ovsx-sign
+//
+// Some notes:
+//
+//   - VSCodium requires a signature to exist, but it does appear to actually read
+//     the signature. Meaning the signature could be empty, incorrect, or a
+//     picture of cat and it would work. There is so signature verification.
+//
+//   - VSCode requires a signature payload to exist, but the context appear
+//     to be somewhat optional.
+//     Following another open source implementation, it appears the '.signature.p7s'
+//     file must exist, but it can be empty.
+//     The signature is stored in a '.signature.sig' file, although it is unclear
+//     is VSCode ever reads this file.
+//     TODO: Properly implement the p7s file, and diverge from the other open
+//     source implementation. Ideally this marketplace would match Microsoft's
+//     marketplace API.
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
-	if s.SigningEnabled() && filepath.Base(fp) == "p7s.sig" {
-		// This file must exist, and it is always empty
-		return mem.NewFileHandle(mem.CreateFile("p7s.sig")), nil
-	}
-
 	if s.SigningEnabled() && filepath.Base(fp) == sigzipFilename {
 		// hijack this request, sign the sig manifest
 		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
