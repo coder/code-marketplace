@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -276,25 +278,32 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 	return s.uri + dir, nil
 }
 
-func (s *Artifactory) FileServer() http.Handler {
-	// TODO: Since we only extract a subset of files perhaps if the file does not
-	// exist we should download the vsix and extract the requested file as a
-	// fallback.  Obviously this seems like quite a bit of overhead so we would
-	// then emit a warning so we can notice that VS Code has added new asset types
-	// that we should be extracting to avoid that overhead.  Other solutions could
-	// be implemented though like extracting the VSIX to disk locally and only
-	// going to Artifactory for the VSIX when it is missing on disk (basically
-	// using the disk as a cache).
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		reader, code, err := s.read(r.Context(), r.URL.Path)
-		if err != nil {
-			http.Error(rw, err.Error(), code)
-			return
+// Open returns a file from Artifactory.
+// TODO: Since we only extract a subset of files perhaps if the file does not
+// exist we should download the vsix and extract the requested file as a
+// fallback.  Obviously this seems like quite a bit of overhead so we would
+// then emit a warning so we can notice that VS Code has added new asset types
+// that we should be extracting to avoid that overhead.  Other solutions could
+// be implemented though like extracting the VSIX to disk locally and only
+// going to Artifactory for the VSIX when it is missing on disk (basically
+// using the disk as a cache).
+func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
+	resp, code, err := s.request(ctx, http.MethodGet, path.Join(s.repo, fp), nil)
+	if err != nil {
+		switch code {
+		case http.StatusNotFound:
+			return nil, fs.ErrNotExist
+		case http.StatusForbidden:
+			return nil, fs.ErrPermission
+		default:
+			return nil, err
 		}
-		defer reader.Close()
-		rw.WriteHeader(http.StatusOK)
-		_, _ = io.Copy(rw, reader)
-	})
+	}
+
+	return artifactoryFile{
+		Response: resp,
+		path:     fp,
+	}, nil
 }
 
 func (s *Artifactory) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
@@ -443,3 +452,30 @@ func (s *Artifactory) Versions(ctx context.Context, publisher, name string) ([]V
 	sort.Sort(ByVersion(versions))
 	return versions, nil
 }
+
+type contextFs struct {
+	ctx  context.Context
+	open func(ctx context.Context, name string) (fs.File, error)
+}
+
+func (c *contextFs) Open(name string) (fs.File, error) {
+	return c.open(c.ctx, name)
+}
+
+var _ fs.File = (*artifactoryFile)(nil)
+var _ fs.FileInfo = (*artifactoryFile)(nil)
+
+type artifactoryFile struct {
+	*http.Response
+	path string
+}
+
+func (a artifactoryFile) Name() string               { return filepath.Base(a.path) }
+func (a artifactoryFile) Size() int64                { return a.Response.ContentLength }
+func (a artifactoryFile) Mode() fs.FileMode          { return fs.FileMode(0) } // ?
+func (a artifactoryFile) ModTime() time.Time         { return time.Now() }
+func (a artifactoryFile) IsDir() bool                { return false }
+func (a artifactoryFile) Sys() any                   { return nil }
+func (a artifactoryFile) Stat() (fs.FileInfo, error) { return a, nil }
+func (a artifactoryFile) Read(i []byte) (int, error) { return a.Response.Body.Read(i) }
+func (a artifactoryFile) Close() error               { return a.Response.Body.Close() }

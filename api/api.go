@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"os"
 	"strconv"
@@ -112,7 +114,13 @@ func New(options *Options) *API {
 	r.Post("/api/extensionquery", api.extensionQuery)
 
 	// Endpoint for getting an extension's files or the extension zip.
-	r.Mount("/files", http.StripPrefix("/files", options.Storage.FileServer()))
+	r.Mount("/files", http.StripPrefix("/files", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		// Convert the storage into a fs.FS, including the request context
+		http.FileServerFS(&contextFs{
+			ctx:  r.Context(),
+			open: options.Storage.Open,
+		}).ServeHTTP(rw, r)
+	})))
 
 	// VS Code can use the files in the response to get file paths but it will
 	// sometimes ignore that and use requests to /assets with hardcoded types to
@@ -255,4 +263,13 @@ func (api *API) assetRedirect(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(rw, r, url, http.StatusMovedPermanently)
+}
+
+type contextFs struct {
+	ctx  context.Context
+	open func(ctx context.Context, name string) (fs.File, error)
+}
+
+func (c *contextFs) Open(name string) (fs.File, error) {
+	return c.open(c.ctx, name)
 }

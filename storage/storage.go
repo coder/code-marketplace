@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"regexp"
@@ -212,7 +213,8 @@ type Storage interface {
 	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error)
 	// FileServer provides a handler for fetching extension repository files from
 	// a client.
-	FileServer() http.Handler
+	//FileServer() fs.FS
+	Open(ctx context.Context, name string) (fs.File, error)
 	// Manifest returns the manifest bytes for the provided extension.  The
 	// extension asset itself (the VSIX) will be included on the manifest even if
 	// it does not exist on the manifest on disk.

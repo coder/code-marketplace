@@ -2,12 +2,12 @@ package extensionsign
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 
-	"github.com/cloudflare/cfssl/scan/crypto/sha256"
 	"golang.org/x/xerrors"
 
 	"github.com/coder/code-marketplace/storage/easyzip"
