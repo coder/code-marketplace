@@ -10,6 +10,8 @@ import (
 	"github.com/coder/code-marketplace/storage"
 )
 
+var _ storage.Storage = (*MockStorage)(nil)
+
 // MockStorage implements storage.Storage for tests.
 type MockStorage struct{}
 
@@ -17,7 +19,7 @@ func NewMockStorage() *MockStorage {
 	return &MockStorage{}
 }
 
-func (s *MockStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte) (string, error) {
+func (s *MockStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte, extra ...storage.File) (string, error) {
 	return "", errors.New("not implemented")
 }
 

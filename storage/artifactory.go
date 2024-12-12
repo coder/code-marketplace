@@ -19,6 +19,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+	"github.com/coder/code-marketplace/storage/easyzip"
 
 	"github.com/coder/code-marketplace/util"
 )
@@ -40,6 +41,8 @@ type ArtifactoryFile struct {
 type ArtifactoryList struct {
 	Files []ArtifactoryFile `json:"files"`
 }
+
+var _ Storage = (*Artifactory)(nil)
 
 // Artifactory implements Storage.  It stores extensions remotely through
 // Artifactory by both copying the VSIX and extracting said VSIX to a tree
@@ -244,7 +247,7 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 		}
 	}
 
-	err := ExtractZip(vsix, func(name string, r io.Reader) error {
+	err := easyzip.ExtractZip(vsix, func(name string, r io.Reader) error {
 		if util.Contains(assets, name) || (browser != "" && strings.HasPrefix(name, browser)) {
 			_, err := s.upload(ctx, path.Join(dir, name), r)
 			return err
@@ -260,6 +263,14 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 	_, err = s.upload(ctx, path.Join(dir, vsixName), bytes.NewReader(vsix))
 	if err != nil {
 		return "", err
+	}
+
+	for _, file := range extra {
+		// TODO: I think this is correct?
+		_, err := s.upload(ctx, path.Join(dir, file.RelativePath), bytes.NewReader(file.Content))
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return s.uri + dir, nil

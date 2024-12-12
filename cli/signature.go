@@ -13,6 +13,7 @@ import (
 func signature() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "signature",
+		Hidden:  true, // Debugging tools
 		Aliases: []string{"sig", "sigs", "signatures"},
 	}
 	cmd.AddCommand(compareSignatureSigZips())

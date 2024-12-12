@@ -14,7 +14,10 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+	"github.com/coder/code-marketplace/storage/easyzip"
 )
+
+var _ Storage = (*Local)(nil)
 
 // Local implements Storage.  It stores extensions locally on disk by both
 // copying the VSIX and extracting said VSIX to a tree structure in the form of
@@ -98,7 +101,7 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 		Version:        identity.Version,
 		TargetPlatform: identity.TargetPlatform,
 	}.String())
-	err := ExtractZip(vsix, func(name string, r io.Reader) error {
+	err := easyzip.ExtractZip(vsix, func(name string, r io.Reader) error {
 		path := filepath.Join(dir, name)
 		err := os.MkdirAll(filepath.Dir(path), 0o755)
 		if err != nil {
@@ -161,12 +164,6 @@ func (s *Local) Manifest(ctx context.Context, publisher, name string, version Ve
 	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 		Type:        VSIXAssetType,
 		Path:        fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest)),
-		Addressable: "true",
-	})
-
-	manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
-		Type:        VSIXSignatureType,
-		Path:        "extension.sigzip",
 		Addressable: "true",
 	})
 

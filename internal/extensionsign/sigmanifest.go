@@ -10,7 +10,7 @@ import (
 	"github.com/cloudflare/cfssl/scan/crypto/sha256"
 	"golang.org/x/xerrors"
 
-	"github.com/coder/code-marketplace/storage"
+	"github.com/coder/code-marketplace/storage/easyzip"
 )
 
 type SignatureManifest struct {
@@ -94,7 +94,7 @@ func GenerateSignatureManifest(vsixFile []byte) (SignatureManifest, error) {
 		Entries: make(map[string]File),
 	}
 
-	err = storage.ExtractZip(vsixFile, func(name string, reader io.Reader) error {
+	err = easyzip.ExtractZip(vsixFile, func(name string, reader io.Reader) error {
 		fm, err := FileManifest(reader)
 		if err != nil {
 			return xerrors.Errorf("file %q: %w", name, err)

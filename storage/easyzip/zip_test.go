@@ -1,4 +1,4 @@
-package storage
+package easyzip
 
 import (
 	"archive/zip"

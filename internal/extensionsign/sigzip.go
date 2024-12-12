@@ -8,11 +8,11 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/coder/code-marketplace/storage"
+	"github.com/coder/code-marketplace/storage/easyzip"
 )
 
 func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
-	r, err := storage.GetZipFileReader(zip, ".signature.manifest")
+	r, err := easyzip.GetZipFileReader(zip, ".signature.manifest")
 	if err != nil {
 		return SignatureManifest{}, xerrors.Errorf("get manifest: %w", err)
 	}
