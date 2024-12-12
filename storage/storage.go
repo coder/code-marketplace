@@ -211,9 +211,9 @@ type Storage interface {
 	// for verification purposes. Extra files can be included, but not required.
 	// All extra files will be placed relative to the manifest outside the vsix.
 	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error)
-	// FileServer provides a handler for fetching extension repository files from
-	// a client.
-	//FileServer() fs.FS
+	// Open mirrors the fs.FS interface of Open, except with a context.
+	// The Open should return files from the extension storage, and used for
+	// serving extensions.
 	Open(ctx context.Context, name string) (fs.File, error)
 	// Manifest returns the manifest bytes for the provided extension.  The
 	// extension asset itself (the VSIX) will be included on the manifest even if
