@@ -26,6 +26,13 @@ type Extension struct {
 	Pack          []string
 }
 
+func (e Extension) Copy() Extension {
+	var n Extension
+	data, _ := json.Marshal(e)
+	_ = json.Unmarshal(data, &n)
+	return n
+}
+
 var Extensions = []Extension{
 	{
 		Publisher:   "foo",
@@ -113,6 +120,7 @@ var Extensions = []Extension{
 }
 
 func ConvertExtensionToManifest(ext Extension, version storage.Version) *storage.VSIXManifest {
+	ext = ext.Copy()
 	return &storage.VSIXManifest{
 		Metadata: storage.VSIXMetadata{
 			Identity: storage.VSIXIdentity{

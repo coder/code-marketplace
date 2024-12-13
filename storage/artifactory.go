@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path"
@@ -15,10 +16,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/afero/mem"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+	"github.com/coder/code-marketplace/storage/easyzip"
 
 	"github.com/coder/code-marketplace/util"
 )
@@ -40,6 +43,8 @@ type ArtifactoryFile struct {
 type ArtifactoryList struct {
 	Files []ArtifactoryFile `json:"files"`
 }
+
+var _ Storage = (*Artifactory)(nil)
 
 // Artifactory implements Storage.  It stores extensions remotely through
 // Artifactory by both copying the VSIX and extracting said VSIX to a tree
@@ -213,7 +218,7 @@ func (s *Artifactory) upload(ctx context.Context, endpoint string, r io.Reader) 
 	return code, nil
 }
 
-func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
+func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
 	dir := path.Join(identity.Publisher, identity.ID, Version{
@@ -244,7 +249,7 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 		}
 	}
 
-	err := ExtractZip(vsix, func(name string, r io.Reader) error {
+	err := easyzip.ExtractZip(vsix, func(name string, r io.Reader) error {
 		if util.Contains(assets, name) || (browser != "" && strings.HasPrefix(name, browser)) {
 			_, err := s.upload(ctx, path.Join(dir, name), r)
 			return err
@@ -262,28 +267,47 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 		return "", err
 	}
 
+	for _, file := range extra {
+		_, err := s.upload(ctx, path.Join(dir, file.RelativePath), bytes.NewReader(file.Content))
+		if err != nil {
+			return "", err
+		}
+	}
+
 	return s.uri + dir, nil
 }
 
-func (s *Artifactory) FileServer() http.Handler {
-	// TODO: Since we only extract a subset of files perhaps if the file does not
-	// exist we should download the vsix and extract the requested file as a
-	// fallback.  Obviously this seems like quite a bit of overhead so we would
-	// then emit a warning so we can notice that VS Code has added new asset types
-	// that we should be extracting to avoid that overhead.  Other solutions could
-	// be implemented though like extracting the VSIX to disk locally and only
-	// going to Artifactory for the VSIX when it is missing on disk (basically
-	// using the disk as a cache).
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		reader, code, err := s.read(r.Context(), r.URL.Path)
-		if err != nil {
-			http.Error(rw, err.Error(), code)
-			return
+// Open returns a file from Artifactory.
+// TODO: Since we only extract a subset of files perhaps if the file does not
+// exist we should download the vsix and extract the requested file as a
+// fallback.  Obviously this seems like quite a bit of overhead so we would
+// then emit a warning so we can notice that VS Code has added new asset types
+// that we should be extracting to avoid that overhead.  Other solutions could
+// be implemented though like extracting the VSIX to disk locally and only
+// going to Artifactory for the VSIX when it is missing on disk (basically
+// using the disk as a cache).
+func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
+	resp, code, err := s.read(ctx, fp)
+	if code != http.StatusOK || err != nil {
+		switch code {
+		case http.StatusNotFound:
+			return nil, fs.ErrNotExist
+		case http.StatusForbidden:
+			return nil, fs.ErrPermission
+		default:
+			return nil, err
 		}
-		defer reader.Close()
-		rw.WriteHeader(http.StatusOK)
-		_, _ = io.Copy(rw, reader)
-	})
+	}
+
+	// TODO: Do no copy the bytes into memory, stream them rather than
+	// storing the entire file into memory.
+	f := mem.NewFileHandle(mem.CreateFile(fp))
+	_, err = io.Copy(f, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, nil
 }
 
 func (s *Artifactory) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {

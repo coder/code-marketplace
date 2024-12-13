@@ -112,7 +112,7 @@ func New(options *Options) *API {
 	r.Post("/api/extensionquery", api.extensionQuery)
 
 	// Endpoint for getting an extension's files or the extension zip.
-	r.Mount("/files", http.StripPrefix("/files", options.Storage.FileServer()))
+	r.Mount("/files", http.StripPrefix("/files", storage.HTTPFileServer(options.Storage)))
 
 	// VS Code can use the files in the response to get file paths but it will
 	// sometimes ignore that and use requests to /assets with hardcoded types to

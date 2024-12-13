@@ -15,21 +15,68 @@ import (
 
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
+	"github.com/coder/code-marketplace/extensionsign"
 
 	"github.com/coder/code-marketplace/api"
 	"github.com/coder/code-marketplace/database"
 	"github.com/coder/code-marketplace/storage"
 )
 
+func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
+	opts = &storage.Options{}
+	var sign bool
+	return func(cmd *cobra.Command) {
+		cmd.Flags().StringVar(&opts.ExtDir, "extensions-dir", "", "The path to extensions.")
+		cmd.Flags().StringVar(&opts.Artifactory, "artifactory", "", "Artifactory server URL.")
+		cmd.Flags().StringVar(&opts.Repo, "repo", "", "Artifactory repository.")
+		cmd.Flags().BoolVar(&sign, "sign", false, "Sign extensions.")
+		_ = cmd.Flags().MarkHidden("sign") // This flag needs to import a key, not just be a bool
+
+		if cmd.Use == "server" {
+			// Server only flags
+			cmd.Flags().DurationVar(&opts.ListCacheDuration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
+		}
+
+		var before func(cmd *cobra.Command, args []string) error
+		if cmd.PreRunE != nil {
+			before = cmd.PreRunE
+		}
+		if cmd.PreRun != nil {
+			beforeNoE := cmd.PreRun
+			before = func(cmd *cobra.Command, args []string) error {
+				beforeNoE(cmd, args)
+				return nil
+			}
+		}
+
+		cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+			opts.Logger = cmdLogger(cmd)
+			if before != nil {
+				return before(cmd, args)
+			}
+			if sign { // TODO: Remove this for an actual key import
+				opts.Signer, _ = extensionsign.GenerateKey()
+			}
+			return nil
+		}
+	}, opts
+}
+
+func cmdLogger(cmd *cobra.Command) slog.Logger {
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	logger := slog.Make(sloghuman.Sink(cmd.ErrOrStderr()))
+	if verbose {
+		logger = logger.Leveled(slog.LevelDebug)
+	}
+	return logger
+}
+
 func server() *cobra.Command {
 	var (
-		address           string
-		artifactory       string
-		extdir            string
-		repo              string
-		listcacheduration time.Duration
-		maxpagesize       int
+		address     string
+		maxpagesize int
 	)
+	addFlags, opts := serverFlags()
 
 	cmd := &cobra.Command{
 		Use:   "server",
@@ -41,26 +88,12 @@ func server() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
+			logger := opts.Logger
 
 			notifyCtx, notifyStop := signal.NotifyContext(ctx, interruptSignals...)
 			defer notifyStop()
 
-			verbose, err := cmd.Flags().GetBool("verbose")
-			if err != nil {
-				return err
-			}
-			logger := slog.Make(sloghuman.Sink(cmd.ErrOrStderr()))
-			if verbose {
-				logger = logger.Leveled(slog.LevelDebug)
-			}
-
-			store, err := storage.NewStorage(ctx, &storage.Options{
-				Artifactory:       artifactory,
-				ExtDir:            extdir,
-				Logger:            logger,
-				Repo:              repo,
-				ListCacheDuration: listcacheduration,
-			})
+			store, err := storage.NewStorage(ctx, opts)
 			if err != nil {
 				return err
 			}
@@ -137,12 +170,9 @@ func server() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
 	cmd.Flags().IntVar(&maxpagesize, "max-page-size", api.MaxPageSizeDefault, "The maximum number of pages to request")
-	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
-	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
 	cmd.Flags().StringVar(&address, "address", "127.0.0.1:3001", "The address on which to serve the marketplace API.")
-	cmd.Flags().DurationVar(&listcacheduration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
+	addFlags(cmd)
 
 	return cmd
 }

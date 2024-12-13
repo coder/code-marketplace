@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,8 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"cdr.dev/slog"
+	"github.com/coder/code-marketplace/storage/easyzip"
 )
+
+var _ Storage = (*Local)(nil)
 
 // Local implements Storage.  It stores extensions locally on disk by both
 // copying the VSIX and extracting said VSIX to a tree structure in the form of
@@ -89,14 +95,14 @@ func (s *Local) list(ctx context.Context) []extension {
 	return list
 }
 
-func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error) {
+func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
 	dir := filepath.Join(s.extdir, identity.Publisher, identity.ID, Version{
 		Version:        identity.Version,
 		TargetPlatform: identity.TargetPlatform,
 	}.String())
-	err := ExtractZip(vsix, func(name string, r io.Reader) error {
+	err := easyzip.ExtractZip(vsix, func(name string, r io.Reader) error {
 		path := filepath.Join(dir, name)
 		err := os.MkdirAll(filepath.Dir(path), 0o755)
 		if err != nil {
@@ -121,11 +127,23 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 		return "", err
 	}
 
+	for _, file := range extra {
+		path := filepath.Join(dir, file.RelativePath)
+		err := os.MkdirAll(filepath.Dir(path), 0o755)
+		if err != nil {
+			return "", err
+		}
+		err = os.WriteFile(path, file.Content, 0o644)
+		if err != nil {
+			return dir, xerrors.Errorf("write extra file %q: %w", path, err)
+		}
+	}
+
 	return dir, nil
 }
 
-func (s *Local) FileServer() http.Handler {
-	return http.FileServer(http.Dir(s.extdir))
+func (s *Local) Open(_ context.Context, fp string) (fs.File, error) {
+	return http.Dir(s.extdir).Open(fp)
 }
 
 func (s *Local) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {

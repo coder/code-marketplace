@@ -10,20 +10,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/xerrors"
 
-	"cdr.dev/slog"
-	"cdr.dev/slog/sloggers/sloghuman"
-
 	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/util"
 )
 
 func add() *cobra.Command {
-	var (
-		artifactory string
-		extdir      string
-		repo        string
-	)
-
+	addFlags, opts := serverFlags()
 	cmd := &cobra.Command{
 		Use:   "add <source>",
 		Short: "Add an extension to the marketplace",
@@ -37,21 +29,7 @@ func add() *cobra.Command {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			verbose, err := cmd.Flags().GetBool("verbose")
-			if err != nil {
-				return err
-			}
-			logger := slog.Make(sloghuman.Sink(cmd.ErrOrStderr()))
-			if verbose {
-				logger = logger.Leveled(slog.LevelDebug)
-			}
-
-			store, err := storage.NewStorage(ctx, &storage.Options{
-				Artifactory: artifactory,
-				ExtDir:      extdir,
-				Logger:      logger,
-				Repo:        repo,
-			})
+			store, err := storage.NewStorage(ctx, opts)
 			if err != nil {
 				return err
 			}
@@ -98,10 +76,7 @@ func add() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
-	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
-	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
+	addFlags(cmd)
 
 	return cmd
 }

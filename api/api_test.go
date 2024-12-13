@@ -171,7 +171,7 @@ func TestAPI(t *testing.T) {
 			Response: "foobar",
 		},
 		{
-			Name:   "FileAPI",
+			Name:   "FileAPINotExists",
 			Path:   "/files/nonexistent",
 			Status: http.StatusNotFound,
 		},

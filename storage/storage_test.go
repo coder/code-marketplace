@@ -25,6 +25,8 @@ type testStorage struct {
 	storage storage.Storage
 	write   func(content []byte, elem ...string)
 	exists  func(elem ...string) bool
+
+	expectedManifest func(man *storage.VSIXManifest)
 }
 type storageFactory = func(t *testing.T) testStorage
 
@@ -104,11 +106,13 @@ func TestNewStorage(t *testing.T) {
 				require.Error(t, err)
 				require.Regexp(t, test.error, err.Error())
 			} else if test.local {
-				_, ok := s.(*storage.Local)
+				under := s.(*storage.Signature)
+				_, ok := under.Storage.(*storage.Local)
 				require.True(t, ok)
 				require.NoError(t, err)
 			} else {
-				_, ok := s.(*storage.Artifactory)
+				under := s.(*storage.Signature)
+				_, ok := under.Storage.(*storage.Artifactory)
 				require.True(t, ok)
 				require.NoError(t, err)
 			}
@@ -129,6 +133,14 @@ func TestStorage(t *testing.T) {
 		{
 			name:    "Artifactory",
 			factory: artifactoryFactory,
+		},
+		{
+			name:    "SignedLocal",
+			factory: signed(true, localFactory),
+		},
+		{
+			name:    "SignedArtifactory",
+			factory: signed(true, artifactoryFactory),
 		},
 	}
 	for _, sf := range factories {
@@ -189,7 +201,7 @@ func testFileServer(t *testing.T, factory storageFactory) {
 			req := httptest.NewRequest("GET", test.path, nil)
 			rec := httptest.NewRecorder()
 
-			server := f.storage.FileServer()
+			server := storage.HTTPFileServer(f.storage)
 			server.ServeHTTP(rec, req)
 
 			resp := rec.Result()
@@ -322,6 +334,9 @@ func testManifest(t *testing.T, factory storageFactory) {
 					Path:        fmt.Sprintf("%s.%s-%s.vsix", test.extension.Publisher, test.extension.Name, test.version),
 					Addressable: "true",
 				})
+				if f.expectedManifest != nil {
+					f.expectedManifest(test.expected)
+				}
 				require.Equal(t, test.expected, manifest)
 			}
 		})

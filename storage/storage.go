@@ -2,10 +2,12 @@ package storage
 
 import (
 	"context"
+	"crypto"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"regexp"
@@ -13,9 +15,11 @@ import (
 	"time"
 
 	"golang.org/x/mod/semver"
+
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+	"github.com/coder/code-marketplace/storage/easyzip"
 )
 
 // VSIXManifest implement XMLManifest.PackageManifest.
@@ -112,6 +116,7 @@ type AssetType string
 const (
 	ManifestAssetType AssetType = "Microsoft.VisualStudio.Code.Manifest" // This is the package.json.
 	VSIXAssetType     AssetType = "Microsoft.VisualStudio.Services.VSIXPackage"
+	VSIXSignatureType AssetType = "Microsoft.VisualStudio.Services.VsixSignature"
 )
 
 // VSIXAsset implements XMLManifest.PackageManifest.Assets.Asset.
@@ -123,6 +128,7 @@ type VSIXAsset struct {
 }
 
 type Options struct {
+	Signer            crypto.Signer
 	Artifactory       string
 	ExtDir            string
 	Repo              string
@@ -203,11 +209,13 @@ func (vs ByVersion) Less(i, j int) bool {
 
 type Storage interface {
 	// AddExtension adds the provided VSIX into storage and returns the location
-	// for verification purposes.
-	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte) (string, error)
-	// FileServer provides a handler for fetching extension repository files from
-	// a client.
-	FileServer() http.Handler
+	// for verification purposes. Extra files can be included, but not required.
+	// All extra files will be placed relative to the manifest outside the vsix.
+	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error)
+	// Open mirrors the fs.FS interface of Open, except with a context.
+	// The Open should return files from the extension storage, and used for
+	// serving extensions.
+	Open(ctx context.Context, name string) (fs.File, error)
 	// Manifest returns the manifest bytes for the provided extension.  The
 	// extension asset itself (the VSIX) will be included on the manifest even if
 	// it does not exist on the manifest on disk.
@@ -230,6 +238,22 @@ type Storage interface {
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error
 }
 
+// HTTPFileServer creates an http.Handler that serves files from the provided
+// storage.
+func HTTPFileServer(s Storage) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		http.FileServerFS(&contextFs{
+			ctx:  r.Context(),
+			open: s.Open,
+		}).ServeHTTP(rw, r)
+	})
+}
+
+type File struct {
+	RelativePath string
+	Content      []byte
+}
+
 const ArtifactoryTokenEnvKey = "ARTIFACTORY_TOKEN"
 
 // NewStorage returns a storage instance based on the provided extension
@@ -240,31 +264,42 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 		return nil, xerrors.Errorf("cannot use both Artifactory and extension directory")
 	} else if options.Artifactory != "" && options.Repo == "" {
 		return nil, xerrors.Errorf("must provide repository")
-	} else if options.Artifactory != "" {
+	}
+
+	var store Storage
+	var err error
+	switch {
+	case options.Artifactory != "":
 		token := os.Getenv(ArtifactoryTokenEnvKey)
 		if token == "" {
 			return nil, xerrors.Errorf("the %s environment variable must be set", ArtifactoryTokenEnvKey)
 		}
-		return NewArtifactoryStorage(ctx, &ArtifactoryOptions{
+		store, err = NewArtifactoryStorage(ctx, &ArtifactoryOptions{
 			ListCacheDuration: options.ListCacheDuration,
 			Logger:            options.Logger,
 			Repo:              options.Repo,
 			Token:             token,
 			URI:               options.Artifactory,
 		})
-	} else if options.ExtDir != "" {
-		return NewLocalStorage(&LocalOptions{
+	case options.ExtDir != "":
+		store, err = NewLocalStorage(&LocalOptions{
 			ListCacheDuration: options.ListCacheDuration,
 			ExtDir:            options.ExtDir,
 		}, options.Logger)
+	default:
+		return nil, xerrors.Errorf("must provide an Artifactory repository or local directory")
 	}
-	return nil, xerrors.Errorf("must provide an Artifactory repository or local directory")
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSignatureStorage(options.Signer, store), nil
 }
 
 // ReadVSIXManifest reads and parses an extension manifest from a vsix file.  If
 // the manifest is invalid it will be returned along with the validation error.
 func ReadVSIXManifest(vsix []byte) (*VSIXManifest, error) {
-	vmr, err := GetZipFileReader(vsix, "extension.vsixmanifest")
+	vmr, err := easyzip.GetZipFileReader(vsix, "extension.vsixmanifest")
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +357,7 @@ type VSIXPackageJSON struct {
 // ReadVSIXPackageJSON reads and parses an extension's package.json from a vsix
 // file.
 func ReadVSIXPackageJSON(vsix []byte, packageJsonPath string) (*VSIXPackageJSON, error) {
-	vpjr, err := GetZipFileReader(vsix, packageJsonPath)
+	vpjr, err := easyzip.GetZipFileReader(vsix, packageJsonPath)
 	if err != nil {
 		return nil, err
 	}
@@ -405,4 +440,13 @@ func ParseExtensionID(id string) (string, string, string, error) {
 		return "", "", "", xerrors.Errorf("\"%s\" does not match <publisher>.<name> or <publisher>.<name>@<version>", id)
 	}
 	return match[0][1], match[0][2], match[0][3], nil
+}
+
+type contextFs struct {
+	ctx  context.Context
+	open func(ctx context.Context, name string) (fs.File, error)
+}
+
+func (c *contextFs) Open(name string) (fs.File, error) {
+	return c.open(c.ctx, name)
 }

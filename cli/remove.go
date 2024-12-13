@@ -10,20 +10,15 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/xerrors"
 
-	"cdr.dev/slog"
-	"cdr.dev/slog/sloggers/sloghuman"
-
 	"github.com/coder/code-marketplace/storage"
 	"github.com/coder/code-marketplace/util"
 )
 
 func remove() *cobra.Command {
 	var (
-		all         bool
-		artifactory string
-		extdir      string
-		repo        string
+		all bool
 	)
+	addFlags, opts := serverFlags()
 
 	cmd := &cobra.Command{
 		Use:   "remove <id>",
@@ -37,21 +32,7 @@ func remove() *cobra.Command {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			verbose, err := cmd.Flags().GetBool("verbose")
-			if err != nil {
-				return err
-			}
-			logger := slog.Make(sloghuman.Sink(cmd.ErrOrStderr()))
-			if verbose {
-				logger = logger.Leveled(slog.LevelDebug)
-			}
-
-			store, err := storage.NewStorage(ctx, &storage.Options{
-				Artifactory: artifactory,
-				ExtDir:      extdir,
-				Logger:      logger,
-				Repo:        repo,
-			})
+			store, err := storage.NewStorage(ctx, opts)
 			if err != nil {
 				return err
 			}
@@ -120,9 +101,7 @@ func remove() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "Whether to delete all versions of the extension.")
-	cmd.Flags().StringVar(&extdir, "extensions-dir", "", "The path to extensions.")
-	cmd.Flags().StringVar(&artifactory, "artifactory", "", "Artifactory server URL.")
-	cmd.Flags().StringVar(&repo, "repo", "", "Artifactory repository.")
+	addFlags(cmd)
 
 	return cmd
 }
