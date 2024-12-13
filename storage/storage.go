@@ -132,6 +132,7 @@ type Options struct {
 	Artifactory       string
 	ExtDir            string
 	Repo              string
+	SaveSigZips       bool
 	Logger            slog.Logger
 	ListCacheDuration time.Duration
 }
@@ -293,7 +294,12 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 		return nil, err
 	}
 
-	return NewSignatureStorage(options.Signer, store), nil
+	signingStorage := NewSignatureStorage(options.Logger, options.Signer, store)
+	if options.SaveSigZips {
+		signingStorage.SaveSigZips()
+	}
+
+	return signingStorage, nil
 }
 
 // ReadVSIXManifest reads and parses an extension manifest from a vsix file.  If

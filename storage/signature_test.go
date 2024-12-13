@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"testing"
 
+	"cdr.dev/slog"
 	"github.com/coder/code-marketplace/extensionsign"
 	"github.com/coder/code-marketplace/storage"
 )
@@ -11,7 +12,7 @@ import (
 func expectSignature(manifest *storage.VSIXManifest) {
 	manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
 		Type:        storage.VSIXSignatureType,
-		Path:        storage.SigzipFilename,
+		Path:        storage.SignatureZipFilename(manifest),
 		Addressable: "true",
 	})
 }
@@ -28,7 +29,7 @@ func signed(signer bool, factory func(t *testing.T) testStorage) func(t *testing
 		}
 
 		return testStorage{
-			storage:          storage.NewSignatureStorage(key, st.storage),
+			storage:          storage.NewSignatureStorage(slog.Make(), key, st.storage),
 			write:            st.write,
 			exists:           st.exists,
 			expectedManifest: exp,

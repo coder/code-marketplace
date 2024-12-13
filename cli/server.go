@@ -31,6 +31,8 @@ func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 		cmd.Flags().StringVar(&opts.Repo, "repo", "", "Artifactory repository.")
 		cmd.Flags().BoolVar(&sign, "sign", false, "Sign extensions.")
 		_ = cmd.Flags().MarkHidden("sign") // This flag needs to import a key, not just be a bool
+		cmd.Flags().BoolVar(&opts.SaveSigZips, "save-sigs", false, "Save signed extensions to disk for debugging.")
+		_ = cmd.Flags().MarkHidden("save-sigs")
 
 		if cmd.Use == "server" {
 			// Server only flags
