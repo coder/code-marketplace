@@ -135,9 +135,6 @@ type Options struct {
 	SaveSigZips       bool
 	Logger            slog.Logger
 	ListCacheDuration time.Duration
-	// SaveSigZips is a flag that will save the signed extension to disk.
-	// This is useful for debugging, but the server will never use this file.
-	saveSigZips bool
 }
 
 type extension struct {
