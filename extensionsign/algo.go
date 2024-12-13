@@ -13,7 +13,7 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var SigningAlgorithm = OpenSSLSign
+var SigningAlgorithm = CMSAlgo
 
 func CMSAlgo(data []byte, certs []*x509.Certificate, signer crypto.Signer) (result []byte, err error) {
 	return cms.SignDetached(data, certs, signer)

@@ -39,7 +39,7 @@ func ExtractP7SSig(zip []byte) ([]byte, error) {
 }
 
 // SignAndZipManifest signs a manifest and zips it up
-func SignAndZipManifest(certs []*x509.Certificate, secret crypto.Signer, manifest json.RawMessage) ([]byte, error) {
+func SignAndZipManifest(certs []*x509.Certificate, secret crypto.Signer, vsixData []byte, manifest json.RawMessage) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -53,19 +53,12 @@ func SignAndZipManifest(certs []*x509.Certificate, secret crypto.Signer, manifes
 		return nil, xerrors.Errorf("write manifest: %w", err)
 	}
 
-	// Empty file
 	p7sFile, err := w.Create(".signature.p7s")
 	if err != nil {
 		return nil, xerrors.Errorf("create empty p7s signature: %w", err)
 	}
 
-	// Actual sig
-	sigFile, err := w.Create(".signature.sig")
-	if err != nil {
-		return nil, xerrors.Errorf("create signature: %w", err)
-	}
-
-	signature, err := secret.Sign(rand.Reader, vsixData, crypto.Hash(0))
+	signature, err := SigningAlgorithm(vsixData, certs, secret)
 	if err != nil {
 		return nil, xerrors.Errorf("sign: %w", err)
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/coder/code-marketplace/extensionsign"
-	"github.com/coder/code-marketplace/storage/easyzip"
 )
 
 func signature() *cobra.Command {
@@ -31,6 +29,10 @@ func signature() *cobra.Command {
 	return cmd
 }
 
+var (
+	localCA = false
+)
+
 func verifySig() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "verify <extension.vsix> <signature.p7s>",
@@ -40,6 +42,11 @@ func verifySig() *cobra.Command {
 			logger := cmdLogger(cmd)
 			ctx := cmd.Context()
 			extensionVsix := args[0]
+			msgData, err := os.ReadFile(extensionVsix)
+			if err != nil {
+				return xerrors.Errorf("read %q: %w", extensionVsix, err)
+			}
+
 			p7sFile := args[1]
 
 			logger.Info(ctx, fmt.Sprintf("Decoding %q", p7sFile))
@@ -49,14 +56,14 @@ func verifySig() *cobra.Command {
 				return xerrors.Errorf("read %q: %w", p7sFile, err)
 			}
 
-			msg, err := easyzip.GetZipFileReader(data, extensionVsix)
-			if err != nil {
-				return xerrors.Errorf("get manifest: %w", err)
-			}
-			msgData, err := io.ReadAll(msg)
-			if err != nil {
-				return xerrors.Errorf("read manifest: %w", err)
-			}
+			//msg, err := easyzip.GetZipFileReader(data, extensionVsix)
+			//if err != nil {
+			//	return xerrors.Errorf("get manifest: %w", err)
+			//}
+			//msgData, err := io.ReadAll(msg)
+			//if err != nil {
+			//	return xerrors.Errorf("read manifest: %w", err)
+			//}
 
 			signed, err := extensionsign.ExtractP7SSig(data)
 			if err != nil {
@@ -87,6 +94,7 @@ func verifySig() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&localCA, "local-ca", true, "Use the local CA for verification.")
 	return cmd
 }
 
@@ -153,12 +161,18 @@ func openSSLVerify(ctx context.Context, logger slog.Logger, message []byte, sign
 		return false, xerrors.Errorf("write signature: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "openssl", "smime", "-verify",
+	if localCA {
+
+	}
+
+	cmd := exec.CommandContext(ctx, "openssl", "cms", "-verify",
 		"-in", sigPath, "-content", msgPath, "-inform", "DER",
-		"-CAfile", "/home/steven/go/src/github.com/coder/code-marketplace/extensionsign/testdata/cert2.pem",
 	)
+	if localCA {
+		cmd.Args = append(cmd.Args, "-CAfile", "/home/steven/go/src/github.com/coder/code-marketplace/extensionsign/testdata/cert2.pem")
+	}
 	output := &strings.Builder{}
-	cmd.Stdout = output
+	//cmd.Stdout = output
 	cmd.Stderr = output
 	err = cmd.Run()
 	fmt.Println(output.String())

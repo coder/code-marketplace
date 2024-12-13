@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"cdr.dev/slog"
 	"github.com/coder/code-marketplace/extensionsign"
 	"github.com/coder/code-marketplace/storage"
@@ -32,7 +34,7 @@ func signed(signer bool, factory func(t *testing.T) testStorage) func(t *testing
 		sst, err := storage.NewSignatureStorage(slog.Make(), key, []*x509.Certificate{}, st.storage)
 		require.NoError(t, err)
 		return testStorage{
-			storage:          storage.NewSignatureStorage(slog.Make(), key, st.storage),
+			storage:          sst,
 			write:            st.write,
 			exists:           st.exists,
 			expectedManifest: exp,

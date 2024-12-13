@@ -14,10 +14,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
-<<<<<<< HEAD
-
-=======
->>>>>>> 13a5775 (chore: more work towards supporting p7s)
 	"github.com/coder/code-marketplace/extensionsign"
 )
 
@@ -208,7 +204,7 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 }
 
 func (s *Signature) SigZip(ctx context.Context, vsix []byte, sigManifest []byte) ([]byte, error) {
-	signed, err := extensionsign.SignAndZipManifest(s.Signer, vsix, sigManifest)
+	signed, err := extensionsign.SignAndZipManifest(s.Certificates, s.Signer, vsix, sigManifest)
 	if err != nil {
 		s.Logger.Error(ctx, "signing manifest", slog.Error(err))
 		return nil, xerrors.Errorf("sign and zip manifest: %w", err)
