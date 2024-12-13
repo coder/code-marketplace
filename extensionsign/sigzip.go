@@ -25,7 +25,7 @@ func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
 	return manifest, nil
 }
 
-func IncludeEmptySignature(manifest json.RawMessage) ([]byte, error) {
+func IncludeEmptySignature() ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -34,7 +34,7 @@ func IncludeEmptySignature(manifest json.RawMessage) ([]byte, error) {
 		return nil, xerrors.Errorf("create manifest: %w", err)
 	}
 
-	_, err = manFile.Write(manifest)
+	_, err = manFile.Write([]byte{})
 	if err != nil {
 		return nil, xerrors.Errorf("write manifest: %w", err)
 	}

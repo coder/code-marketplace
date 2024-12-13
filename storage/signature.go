@@ -2,8 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -49,26 +47,6 @@ func (s *Signature) SigningEnabled() bool {
 	return s.IncludeEmptySignatures
 }
 
-// AddExtension includes the signature manifest of the vsix. Signing happens on
-// demand, so leave the manifest unsigned. This is safe to do even if
-// 'signExtensions' is disabled, as these files lay dormant until signed.
-func (s *Signature) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error) {
-	sigManifest, err := extensionsign.GenerateSignatureManifest(vsix)
-	if err != nil {
-		return "", xerrors.Errorf("generate signature manifest: %w", err)
-	}
-
-	sigManifestJSON, err := json.Marshal(sigManifest)
-	if err != nil {
-		return "", xerrors.Errorf("encode signature manifest: %w", err)
-	}
-
-	return s.Storage.AddExtension(ctx, manifest, vsix, append(extra, File{
-		RelativePath: sigManifestName,
-		Content:      sigManifestJSON,
-	})...)
-}
-
 func (s *Signature) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
 	manifest, err := s.Storage.Manifest(ctx, publisher, name, version)
 	if err != nil {
@@ -95,8 +73,7 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 // Open will intercept requests for signed extensions payload.
 // It does this by looking for 'SigzipFileExtension' or p7s.sig.
 //
-// The signed payload and signing process is taken from:
-// https://github.com/filiptronicek/node-ovsx-sign
+// The signed payload is completely empty. Nothing it actually signed.
 //
 // Some notes:
 //
@@ -110,22 +87,8 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 //     will not work.
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 	if s.SigningEnabled() && strings.HasSuffix(filepath.Base(fp), SigzipFileExtension) {
-		// hijack this request, sign the sig manifest
-		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
-		if err != nil {
-			// If this file is missing, it means the extension was added before
-			// signatures were handled by the marketplace.
-			// TODO: Generate the sig manifest payload and insert it?
-			return nil, xerrors.Errorf("open signature manifest: %w", err)
-		}
-		defer manifest.Close()
-
-		manifestData, err := io.ReadAll(manifest)
-		if err != nil {
-			return nil, xerrors.Errorf("read signature manifest: %w", err)
-		}
-
-		signed, err := s.SigZip(ctx, manifestData)
+		// hijack this request, return an empty signature payload
+		signed, err := extensionsign.IncludeEmptySignature()
 		if err != nil {
 			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
 		}
@@ -136,14 +99,4 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 	}
 
 	return s.Storage.Open(ctx, fp)
-}
-
-// SigZip currently just returns an empty signature.
-func (s *Signature) SigZip(ctx context.Context, sigManifest []byte) ([]byte, error) {
-	signed, err := extensionsign.IncludeEmptySignature(sigManifest)
-	if err != nil {
-		s.Logger.Error(ctx, "signing manifest", slog.Error(err))
-		return nil, xerrors.Errorf("sign and zip manifest: %w", err)
-	}
-	return signed, nil
 }
