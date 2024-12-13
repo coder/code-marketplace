@@ -299,6 +299,8 @@ func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
 		}
 	}
 
+	// TODO: Do no copy the bytes into memory, stream them rather than
+	// storing the entire file into memory.
 	f := mem.NewFileHandle(mem.CreateFile(fp))
 	_, err = io.Copy(f, resp)
 	if err != nil {
