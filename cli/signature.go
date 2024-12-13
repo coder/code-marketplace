@@ -33,7 +33,7 @@ func signature() *cobra.Command {
 
 func verifySig() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "verify",
+		Use:   "verify <extension.vsix> <signature.p7s>",
 		Short: "Decode & verify a signature archive.",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -49,7 +49,7 @@ func verifySig() *cobra.Command {
 				return xerrors.Errorf("read %q: %w", p7sFile, err)
 			}
 
-			msg, err := easyzip.GetZipFileReader(data, ".signature.manifest")
+			msg, err := easyzip.GetZipFileReader(data, extensionVsix)
 			if err != nil {
 				return xerrors.Errorf("get manifest: %w", err)
 			}
