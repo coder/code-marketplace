@@ -4,8 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto"
-	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"io"
 
 	"golang.org/x/xerrors"
 
@@ -27,8 +28,18 @@ func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
 	return manifest, nil
 }
 
+func ExtractP7SSig(zip []byte) ([]byte, error) {
+	r, err := easyzip.GetZipFileReader(zip, ".signature.p7s")
+	if err != nil {
+		return nil, xerrors.Errorf("get p7s: %w", err)
+	}
+
+	defer r.Close()
+	return io.ReadAll(r)
+}
+
 // SignAndZipManifest signs a manifest and zips it up
-func SignAndZipManifest(secret crypto.Signer, vsixData []byte, manifest json.RawMessage) ([]byte, error) {
+func SignAndZipManifest(certs []*x509.Certificate, secret crypto.Signer, vsixData []byte, manifest json.RawMessage) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -42,24 +53,17 @@ func SignAndZipManifest(secret crypto.Signer, vsixData []byte, manifest json.Raw
 		return nil, xerrors.Errorf("write manifest: %w", err)
 	}
 
-	// Empty file
-	_, err = w.Create(".signature.p7s")
+	p7sFile, err := w.Create(".signature.p7s")
 	if err != nil {
 		return nil, xerrors.Errorf("create empty p7s signature: %w", err)
 	}
 
-	// Actual sig
-	sigFile, err := w.Create(".signature.sig")
-	if err != nil {
-		return nil, xerrors.Errorf("create signature: %w", err)
-	}
-
-	signature, err := secret.Sign(rand.Reader, vsixData, crypto.Hash(0))
+	signature, err := SigningAlgorithm(vsixData, certs, secret)
 	if err != nil {
 		return nil, xerrors.Errorf("sign: %w", err)
 	}
 
-	_, err = sigFile.Write(signature)
+	_, err = p7sFile.Write(signature)
 	if err != nil {
 		return nil, xerrors.Errorf("write signature: %w", err)
 	}

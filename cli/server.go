@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"os"
 	"os/signal"
 	"strings"
 	"time"
@@ -24,13 +25,14 @@ import (
 
 func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 	opts = &storage.Options{}
-	var sign bool
+	var certificates []string
+	var signingKeyFile string
 	return func(cmd *cobra.Command) {
 		cmd.Flags().StringVar(&opts.ExtDir, "extensions-dir", "", "The path to extensions.")
 		cmd.Flags().StringVar(&opts.Artifactory, "artifactory", "", "Artifactory server URL.")
 		cmd.Flags().StringVar(&opts.Repo, "repo", "", "Artifactory repository.")
-		cmd.Flags().BoolVar(&sign, "sign", false, "Sign extensions.")
-		_ = cmd.Flags().MarkHidden("sign") // This flag needs to import a key, not just be a bool
+		cmd.Flags().StringArrayVar(&certificates, "certs", []string{}, "The path to certificates that match the signing key.")
+		cmd.Flags().StringVar(&signingKeyFile, "key", "", "The path to signing key file in PEM format.")
 		cmd.Flags().BoolVar(&opts.SaveSigZips, "save-sigs", false, "Save signed extensions to disk for debugging.")
 		_ = cmd.Flags().MarkHidden("save-sigs")
 
@@ -56,8 +58,21 @@ func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 			if before != nil {
 				return before(cmd, args)
 			}
-			if sign { // TODO: Remove this for an actual key import
-				opts.Signer, _ = extensionsign.GenerateKey()
+			if signingKeyFile != "" { // TODO: Remove this for an actual key import
+				signingKey, err := os.ReadFile(signingKeyFile)
+				if err != nil {
+					return xerrors.Errorf("read signing key: %w", err)
+				}
+
+				signer, err := extensionsign.LoadKey(signingKey)
+				if err != nil {
+					return xerrors.Errorf("load signing key: %w", err)
+				}
+				opts.Signer = signer
+				opts.Certificates, err = extensionsign.LoadCertificatesFromDisk(cmd.Context(), opts.Logger, certificates)
+				if err != nil {
+					return xerrors.Errorf("load certificates: %w", err)
+				}
 			}
 			return nil
 		}

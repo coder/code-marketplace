@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"crypto"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -128,13 +129,17 @@ type VSIXAsset struct {
 }
 
 type Options struct {
-	Signer            crypto.Signer
 	Artifactory       string
 	ExtDir            string
 	Repo              string
-	SaveSigZips       bool
 	Logger            slog.Logger
 	ListCacheDuration time.Duration
+
+	// Signed and Certificate are used to sign extensions.
+	// The signer should have a corresponding certificate in the Certificates.
+	Signer       crypto.Signer
+	Certificates []*x509.Certificate
+	SaveSigZips  bool
 }
 
 type extension struct {
@@ -294,7 +299,11 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 		return nil, err
 	}
 
-	signingStorage := NewSignatureStorage(options.Logger, options.Signer, store)
+	signingStorage, err := NewSignatureStorage(options.Logger, options.Signer, options.Certificates, store)
+	if err != nil {
+		return nil, err
+	}
+
 	if options.SaveSigZips {
 		signingStorage.SaveSigZips()
 	}
