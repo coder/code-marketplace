@@ -29,9 +29,13 @@ func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 		cmd.Flags().StringVar(&opts.ExtDir, "extensions-dir", "", "The path to extensions.")
 		cmd.Flags().StringVar(&opts.Artifactory, "artifactory", "", "Artifactory server URL.")
 		cmd.Flags().StringVar(&opts.Repo, "repo", "", "Artifactory repository.")
-		cmd.Flags().DurationVar(&opts.ListCacheDuration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
 		cmd.Flags().BoolVar(&sign, "sign", false, "Sign extensions.")
 		_ = cmd.Flags().MarkHidden("sign") // This flag needs to import a key, not just be a bool
+
+		if cmd.Use == "server" {
+			// Server only flags
+			cmd.Flags().DurationVar(&opts.ListCacheDuration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
+		}
 
 		var before func(cmd *cobra.Command, args []string) error
 		if cmd.PreRunE != nil {

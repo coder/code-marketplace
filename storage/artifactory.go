@@ -268,7 +268,6 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 	}
 
 	for _, file := range extra {
-		// TODO: I think this is correct?
 		_, err := s.upload(ctx, path.Join(dir, file.RelativePath), bytes.NewReader(file.Content))
 		if err != nil {
 			return "", err
