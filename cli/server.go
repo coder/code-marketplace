@@ -15,8 +15,6 @@ import (
 
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
-	"github.com/coder/code-marketplace/extensionsign"
-
 	"github.com/coder/code-marketplace/api"
 	"github.com/coder/code-marketplace/database"
 	"github.com/coder/code-marketplace/storage"
@@ -24,18 +22,14 @@ import (
 
 func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 	opts = &storage.Options{}
-	var sign bool
 	return func(cmd *cobra.Command) {
 		cmd.Flags().StringVar(&opts.ExtDir, "extensions-dir", "", "The path to extensions.")
 		cmd.Flags().StringVar(&opts.Artifactory, "artifactory", "", "Artifactory server URL.")
 		cmd.Flags().StringVar(&opts.Repo, "repo", "", "Artifactory repository.")
-		cmd.Flags().BoolVar(&sign, "sign", false, "Sign extensions.")
-		_ = cmd.Flags().MarkHidden("sign") // This flag needs to import a key, not just be a bool
-		cmd.Flags().BoolVar(&opts.SaveSigZips, "save-sigs", false, "Save signed extensions to disk for debugging.")
-		_ = cmd.Flags().MarkHidden("save-sigs")
 
 		if cmd.Use == "server" {
 			// Server only flags
+			cmd.Flags().BoolVar(&opts.IncludeEmptySignatures, "sign", false, "Includes an empty signature for all extensions.")
 			cmd.Flags().DurationVar(&opts.ListCacheDuration, "list-cache-duration", time.Minute, "The duration of the extension cache.")
 		}
 
@@ -55,9 +49,6 @@ func serverFlags() (addFlags func(cmd *cobra.Command), opts *storage.Options) {
 			opts.Logger = cmdLogger(cmd)
 			if before != nil {
 				return before(cmd, args)
-			}
-			if sign { // TODO: Remove this for an actual key import
-				opts.Signer, _ = extensionsign.GenerateKey()
 			}
 			return nil
 		}

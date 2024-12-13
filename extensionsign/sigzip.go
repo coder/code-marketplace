@@ -3,8 +3,6 @@ package extensionsign
 import (
 	"archive/zip"
 	"bytes"
-	"crypto"
-	"crypto/rand"
 	"encoding/json"
 
 	"golang.org/x/xerrors"
@@ -27,8 +25,7 @@ func ExtractSignatureManifest(zip []byte) (SignatureManifest, error) {
 	return manifest, nil
 }
 
-// SignAndZipManifest signs a manifest and zips it up
-func SignAndZipManifest(secret crypto.Signer, vsixData []byte, manifest json.RawMessage) ([]byte, error) {
+func IncludeEmptySignature(manifest json.RawMessage) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -46,22 +43,6 @@ func SignAndZipManifest(secret crypto.Signer, vsixData []byte, manifest json.Raw
 	_, err = w.Create(".signature.p7s")
 	if err != nil {
 		return nil, xerrors.Errorf("create empty p7s signature: %w", err)
-	}
-
-	// Actual sig
-	sigFile, err := w.Create(".signature.sig")
-	if err != nil {
-		return nil, xerrors.Errorf("create signature: %w", err)
-	}
-
-	signature, err := secret.Sign(rand.Reader, vsixData, crypto.Hash(0))
-	if err != nil {
-		return nil, xerrors.Errorf("sign: %w", err)
-	}
-
-	_, err = sigFile.Write(signature)
-	if err != nil {
-		return nil, xerrors.Errorf("write signature: %w", err)
 	}
 
 	err = w.Close()
