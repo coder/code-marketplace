@@ -12,7 +12,7 @@ import (
 func expectSignature(manifest *storage.VSIXManifest) {
 	manifest.Assets.Asset = append(manifest.Assets.Asset, storage.VSIXAsset{
 		Type:        storage.VSIXSignatureType,
-		Path:        storage.SigzipFileExtension,
+		Path:        storage.SignatureZipFilename(manifest),
 		Addressable: "true",
 	})
 }
