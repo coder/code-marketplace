@@ -77,10 +77,24 @@ func verifySig() *cobra.Command {
 			}
 			logger.Info(ctx, fmt.Sprintf("Valid: %t", valid))
 
-			fmt.Println("----------------OpenSSL Verify----------------")
-			valid, err = openSSLVerify(ctx, logger, msgData, signed)
+			fmt.Println("----------------OpenSSL Verify CMS----------------")
+			valid, err = openSSLVerify(ctx, "cms", logger, msgData, signed)
 			if err != nil {
 				logger.Error(ctx, "openssl verify", slog.Error(err))
+			}
+			logger.Info(ctx, fmt.Sprintf("Valid: %t", valid))
+
+			fmt.Println("----------------OpenSSL Verify SMIME----------------")
+			valid, err = openSSLVerify(ctx, "smime", logger, msgData, signed)
+			if err != nil {
+				logger.Error(ctx, "openssl verify", slog.Error(err))
+			}
+			logger.Info(ctx, fmt.Sprintf("Valid: %t", valid))
+
+			fmt.Println("----------------node-ovsx-sign Verify----------------")
+			valid, err = openVSXSignVerify(ctx, logger, extensionVsix, p7sFile)
+			if err != nil {
+				logger.Error(ctx, "open vsx verify", slog.Error(err))
 			}
 			logger.Info(ctx, fmt.Sprintf("Valid: %t", valid))
 
@@ -143,7 +157,7 @@ func goVerify(ctx context.Context, logger slog.Logger, message []byte, signature
 	return verifyErr == nil, nil
 }
 
-func openSSLVerify(ctx context.Context, logger slog.Logger, message []byte, signature []byte) (bool, error) {
+func openSSLVerify(ctx context.Context, algo string, logger slog.Logger, message []byte, signature []byte) (bool, error) {
 	// openssl cms -verify -in message_from_alice_for_bob.msg -inform DER -CAfile ehealth_root_ca.cer | openssl cms -decrypt -inform DER -recip bob_etk_pair.pem  | openssl cms -inform DER -cmsout -print
 	tmpdir := os.TempDir()
 	tmpdir = filepath.Join(tmpdir, "verify-sigs")
@@ -165,7 +179,8 @@ func openSSLVerify(ctx context.Context, logger slog.Logger, message []byte, sign
 
 	}
 
-	cmd := exec.CommandContext(ctx, "openssl", "cms", "-verify",
+	// smime or cms
+	cmd := exec.CommandContext(ctx, "openssl", algo, "-verify",
 		"-in", sigPath, "-content", msgPath, "-inform", "DER",
 	)
 	if localCA {
@@ -175,6 +190,30 @@ func openSSLVerify(ctx context.Context, logger slog.Logger, message []byte, sign
 	//cmd.Stdout = output
 	cmd.Stderr = output
 	err = cmd.Run()
+	fmt.Println(output.String())
+	if err != nil {
+		return false, xerrors.Errorf("run verify %q: %w", cmd.String(), err)
+	}
+
+	return cmd.ProcessState.ExitCode() == 0, nil
+}
+
+func openVSXSignVerify(ctx context.Context, logger slog.Logger, vsixPath, sigPath string) (bool, error) {
+	bin := os.Getenv("OPEN_VSX_SIGN_PATH")
+	if bin == "" {
+		return false, xerrors.Errorf("OPEN_VSX_SIGN_PATH not set")
+	}
+
+	cmd := exec.CommandContext(ctx, bin, "verify",
+		vsixPath,
+		sigPath,
+		"--public-key", "/home/steven/go/src/github.com/coder/code-marketplace/extensionsign/testdata/public.pem",
+	)
+	fmt.Println(cmd.String())
+	output := &strings.Builder{}
+	cmd.Stdout = output
+	cmd.Stderr = output
+	err := cmd.Run()
 	fmt.Println(output.String())
 	if err != nil {
 		return false, xerrors.Errorf("run verify %q: %w", cmd.String(), err)
