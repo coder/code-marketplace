@@ -7,9 +7,12 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/afero/mem"
 	"golang.org/x/xerrors"
+
+	"cdr.dev/slog"
 
 	"github.com/coder/code-marketplace/extensionsign"
 )
@@ -17,23 +20,38 @@ import (
 var _ Storage = (*Signature)(nil)
 
 const (
-	SigzipFilename  = "extension.sigzip"
-	sigManifestName = ".signature.manifest"
+	SigzipFileExtension = ".signature.p7s"
+	sigManifestName     = ".signature.manifest"
 )
+
+func SignatureZipFilename(manifest *VSIXManifest) string {
+	return ExtensionVSIXNameFromManifest(manifest) + SigzipFileExtension
+}
 
 // Signature is a storage wrapper that can sign extensions on demand.
 type Signature struct {
 	// Signer if provided, will be used to sign extensions. If not provided,
 	// no extensions will be signed.
 	Signer crypto.Signer
+	Logger slog.Logger
+	// SaveSigZips is a flag that will save the signed extension to disk.
+	// This is useful for debugging, but the server will never use this file.
+	saveSigZips bool
 	Storage
 }
 
-func NewSignatureStorage(signer crypto.Signer, s Storage) *Signature {
+func NewSignatureStorage(logger slog.Logger, signer crypto.Signer, s Storage) *Signature {
 	return &Signature{
 		Signer:  signer,
 		Storage: s,
 	}
+}
+
+func (s *Signature) SaveSigZips() {
+	if !s.saveSigZips {
+		s.Logger.Info(context.Background(), "extension signatures will be saved to disk, do not use this in production")
+	}
+	s.saveSigZips = true
 }
 
 func (s *Signature) SigningEnabled() bool {
@@ -49,14 +67,26 @@ func (s *Signature) AddExtension(ctx context.Context, manifest *VSIXManifest, vs
 		return "", xerrors.Errorf("generate signature manifest: %w", err)
 	}
 
-	data, err := json.Marshal(sigManifest)
+	sigManifestJSON, err := json.Marshal(sigManifest)
 	if err != nil {
 		return "", xerrors.Errorf("encode signature manifest: %w", err)
 	}
 
+	if s.SigningEnabled() && s.saveSigZips {
+		signed, err := s.SigZip(ctx, vsix, sigManifestJSON)
+		if err != nil {
+			s.Logger.Error(ctx, "signing manifest", slog.Error(err))
+			return "", xerrors.Errorf("sign and zip manifest: %w", err)
+		}
+		extra = append(extra, File{
+			RelativePath: SignatureZipFilename(manifest),
+			Content:      signed,
+		})
+	}
+
 	return s.Storage.AddExtension(ctx, manifest, vsix, append(extra, File{
 		RelativePath: sigManifestName,
-		Content:      data,
+		Content:      sigManifestJSON,
 	})...)
 }
 
@@ -68,14 +98,14 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 
 	if s.SigningEnabled() {
 		for _, asset := range manifest.Assets.Asset {
-			if asset.Path == SigzipFilename {
+			if asset.Path == SignatureZipFilename(manifest) {
 				// Already signed
 				return manifest, nil
 			}
 		}
 		manifest.Assets.Asset = append(manifest.Assets.Asset, VSIXAsset{
 			Type:        VSIXSignatureType,
-			Path:        SigzipFilename,
+			Path:        SignatureZipFilename(manifest),
 			Addressable: "true",
 		})
 		return manifest, nil
@@ -84,7 +114,7 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 }
 
 // Open will intercept requests for signed extensions payload.
-// It does this by looking for 'SigzipFilename' or p7s.sig.
+// It does this by looking for 'SigzipFileExtension' or p7s.sig.
 //
 // The signed payload and signing process is taken from:
 // https://github.com/filiptronicek/node-ovsx-sign
@@ -105,7 +135,10 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 //     source implementation. Ideally this marketplace would match Microsoft's
 //     marketplace API.
 func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
-	if s.SigningEnabled() && filepath.Base(fp) == SigzipFilename {
+	if s.SigningEnabled() && strings.HasSuffix(filepath.Base(fp), SigzipFileExtension) {
+		base := filepath.Base(fp)
+		vsixPath := strings.TrimSuffix(base, SigzipFileExtension)
+
 		// hijack this request, sign the sig manifest
 		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
 		if err != nil {
@@ -121,15 +154,39 @@ func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
 			return nil, xerrors.Errorf("read signature manifest: %w", err)
 		}
 
-		signed, err := extensionsign.SignAndZipManifest(s.Signer, manifestData)
+		vsix, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), vsixPath+".vsix"))
+		if err != nil {
+			// If this file is missing, it means the extension was added before
+			// signatures were handled by the marketplace.
+			// TODO: Generate the sig manifest payload and insert it?
+			return nil, xerrors.Errorf("open signature manifest: %w", err)
+		}
+		defer vsix.Close()
+
+		vsixData, err := io.ReadAll(vsix)
+		if err != nil {
+			return nil, xerrors.Errorf("read signature manifest: %w", err)
+		}
+
+		// TODO: Fetch the VSIX payload from the storage
+		signed, err := s.SigZip(ctx, vsixData, manifestData)
 		if err != nil {
 			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
 		}
 
-		f := mem.NewFileHandle(mem.CreateFile(SigzipFilename))
+		f := mem.NewFileHandle(mem.CreateFile(fp))
 		_, err = f.Write(signed)
 		return f, err
 	}
 
 	return s.Storage.Open(ctx, fp)
+}
+
+func (s *Signature) SigZip(ctx context.Context, vsix []byte, sigManifest []byte) ([]byte, error) {
+	signed, err := extensionsign.SignAndZipManifest(s.Signer, vsix, sigManifest)
+	if err != nil {
+		s.Logger.Error(ctx, "signing manifest", slog.Error(err))
+		return nil, xerrors.Errorf("sign and zip manifest: %w", err)
+	}
+	return signed, nil
 }
