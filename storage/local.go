@@ -129,7 +129,7 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 
 	for _, file := range extra {
 		path := filepath.Join(dir, file.RelativePath)
-		err := os.MkdirAll(filepath.Dir(path), 0o644)
+		err := os.MkdirAll(filepath.Dir(path), 0o755)
 		if err != nil {
 			return "", err
 		}

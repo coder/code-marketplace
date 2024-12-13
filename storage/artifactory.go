@@ -288,7 +288,7 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 // going to Artifactory for the VSIX when it is missing on disk (basically
 // using the disk as a cache).
 func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
-	resp, code, err := s.request(ctx, http.MethodGet, path.Join(s.repo, fp), nil)
+	resp, code, err := s.read(ctx, path.Join(s.repo, fp))
 	if err != nil {
 		switch code {
 		case http.StatusNotFound:
@@ -301,7 +301,7 @@ func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
 	}
 
 	f := mem.NewFileHandle(mem.CreateFile(fp))
-	_, err = io.Copy(f, resp.Body)
+	_, err = io.Copy(f, resp)
 	if err != nil {
 		return nil, err
 	}

@@ -93,7 +93,7 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 //
 //   - VSCodium requires a signature to exist, but it does appear to actually read
 //     the signature. Meaning the signature could be empty, incorrect, or a
-//     picture of cat and it would work. There is so signature verification.
+//     picture of cat and it would work. There is no signature verification.
 //
 //   - VSCode requires a signature payload to exist, but the context appear
 //     to be somewhat optional.

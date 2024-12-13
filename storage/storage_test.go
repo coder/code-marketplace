@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/coder/code-marketplace/storage"
@@ -338,9 +337,7 @@ func testManifest(t *testing.T, factory storageFactory) {
 				if f.expectedManifest != nil {
 					f.expectedManifest(test.expected)
 				}
-				if !assert.Equal(t, test.expected, manifest) {
-					fmt.Println("Asd")
-				}
+				require.Equal(t, test.expected, manifest)
 			}
 		})
 	}
