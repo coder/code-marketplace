@@ -4,15 +4,15 @@ import (
 	"context"
 	"crypto"
 	"encoding/json"
-	"io"
-	"io/fs"
-	"path/filepath"
+	"net/http"
+	"strconv"
 	"strings"
 
-	"github.com/spf13/afero/mem"
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
+	"github.com/coder/code-marketplace/api/httpapi"
+	"github.com/coder/code-marketplace/api/httpmw"
 
 	"github.com/coder/code-marketplace/extensionsign"
 )
@@ -113,7 +113,7 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 	return manifest, nil
 }
 
-// Open will intercept requests for signed extensions payload.
+// FileServer will intercept requests for signed extensions payload.
 // It does this by looking for 'SigzipFileExtension' or p7s.sig.
 //
 // The signed payload and signing process is taken from:
@@ -125,61 +125,32 @@ func (s *Signature) Manifest(ctx context.Context, publisher, name string, versio
 //     the signature. Meaning the signature could be empty, incorrect, or a
 //     picture of cat and it would work. There is no signature verification.
 //
-//   - VSCode requires a signature payload to exist, but the context appear
-//     to be somewhat optional.
-//     Following another open source implementation, it appears the '.signature.p7s'
-//     file must exist, but it can be empty.
-//     The signature is stored in a '.signature.sig' file, although it is unclear
-//     is VSCode ever reads this file.
-//     TODO: Properly implement the p7s file, and diverge from the other open
-//     source implementation. Ideally this marketplace would match Microsoft's
-//     marketplace API.
-func (s *Signature) Open(ctx context.Context, fp string) (fs.File, error) {
-	if s.SigningEnabled() && strings.HasSuffix(filepath.Base(fp), SigzipFileExtension) {
-		base := filepath.Base(fp)
-		vsixPath := strings.TrimSuffix(base, SigzipFileExtension)
+//   - VSCode requires a signature payload to exist, but the content is optional
+//     for linux users.
+//     For windows (maybe mac?) users, the signature must be valid, and this
+//     implementation will not work.
+func (s *Signature) FileServer() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if s.SigningEnabled() && strings.HasSuffix(r.URL.Path, SigzipFileExtension) {
+			// hijack this request, return an empty signature payload
+			signed, err := extensionsign.IncludeEmptySignature()
+			if err != nil {
+				httpapi.Write(rw, http.StatusInternalServerError, httpapi.ErrorResponse{
+					Message:   "Unable to generate empty signature for extension",
+					Detail:    err.Error(),
+					RequestID: httpmw.RequestID(r),
+				})
+				return
+			}
 
-		// hijack this request, sign the sig manifest
-		manifest, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), sigManifestName))
-		if err != nil {
-			// If this file is missing, it means the extension was added before
-			// signatures were handled by the marketplace.
-			// TODO: Generate the sig manifest payload and insert it?
-			return nil, xerrors.Errorf("open signature manifest: %w", err)
-		}
-		defer manifest.Close()
-
-		manifestData, err := io.ReadAll(manifest)
-		if err != nil {
-			return nil, xerrors.Errorf("read signature manifest: %w", err)
+			rw.Header().Set("Content-Length", strconv.FormatInt(int64(len(signed)), 10))
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write(signed)
+			return
 		}
 
-		vsix, err := s.Storage.Open(ctx, filepath.Join(filepath.Dir(fp), vsixPath+".vsix"))
-		if err != nil {
-			// If this file is missing, it means the extension was added before
-			// signatures were handled by the marketplace.
-			// TODO: Generate the sig manifest payload and insert it?
-			return nil, xerrors.Errorf("open signature manifest: %w", err)
-		}
-		defer vsix.Close()
-
-		vsixData, err := io.ReadAll(vsix)
-		if err != nil {
-			return nil, xerrors.Errorf("read signature manifest: %w", err)
-		}
-
-		// TODO: Fetch the VSIX payload from the storage
-		signed, err := s.SigZip(ctx, vsixData, manifestData)
-		if err != nil {
-			return nil, xerrors.Errorf("sign and zip manifest: %w", err)
-		}
-
-		f := mem.NewFileHandle(mem.CreateFile(fp))
-		_, err = f.Write(signed)
-		return f, err
-	}
-
-	return s.Storage.Open(ctx, fp)
+		s.Storage.FileServer().ServeHTTP(rw, r)
+	})
 }
 
 func (s *Signature) SigZip(ctx context.Context, vsix []byte, sigManifest []byte) ([]byte, error) {
