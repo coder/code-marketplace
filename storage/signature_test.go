@@ -1,11 +1,9 @@
 package storage_test
 
 import (
-	"crypto"
 	"testing"
 
 	"cdr.dev/slog"
-	"github.com/coder/code-marketplace/extensionsign"
 	"github.com/coder/code-marketplace/storage"
 )
 
@@ -21,10 +19,10 @@ func expectSignature(manifest *storage.VSIXManifest) {
 func signed(signer bool, factory func(t *testing.T) testStorage) func(t *testing.T) testStorage {
 	return func(t *testing.T) testStorage {
 		st := factory(t)
-		var key crypto.Signer
+		key := false
 		var exp func(*storage.VSIXManifest)
 		if signer {
-			key, _ = extensionsign.GenerateKey()
+			key = true
 			exp = expectSignature
 		}
 

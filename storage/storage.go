@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"crypto"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -128,13 +127,12 @@ type VSIXAsset struct {
 }
 
 type Options struct {
-	Signer            crypto.Signer
-	Artifactory       string
-	ExtDir            string
-	Repo              string
-	SaveSigZips       bool
-	Logger            slog.Logger
-	ListCacheDuration time.Duration
+	IncludeEmptySignatures bool
+	Artifactory            string
+	ExtDir                 string
+	Repo                   string
+	Logger                 slog.Logger
+	ListCacheDuration      time.Duration
 }
 
 type extension struct {
@@ -294,10 +292,7 @@ func NewStorage(ctx context.Context, options *Options) (Storage, error) {
 		return nil, err
 	}
 
-	signingStorage := NewSignatureStorage(options.Logger, options.Signer, store)
-	if options.SaveSigZips {
-		signingStorage.SaveSigZips()
-	}
+	signingStorage := NewSignatureStorage(options.Logger, options.IncludeEmptySignatures, store)
 
 	return signingStorage, nil
 }

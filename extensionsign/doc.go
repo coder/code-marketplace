@@ -1,2 +1,2 @@
-// Package extensionsign is a Go implementation of https://github.com/filiptronicek/node-ovsx-sign
+// Package extensionsign provides utilities for working with extension signatures.
 package extensionsign
