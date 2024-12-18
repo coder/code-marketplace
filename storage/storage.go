@@ -213,10 +213,9 @@ type Storage interface {
 	// for verification purposes. Extra files can be included, but not required.
 	// All extra files will be placed relative to the manifest outside the vsix.
 	AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error)
-	// Open mirrors the fs.FS interface of Open, except with a context.
-	// The Open should return files from the extension storage, and used for
-	// serving extensions.
-	Open(ctx context.Context, name string) (fs.File, error)
+	// FileServer provides a handler for fetching extension repository files from
+	// a client.
+	FileServer() http.Handler
 	// Manifest returns the manifest bytes for the provided extension.  The
 	// extension asset itself (the VSIX) will be included on the manifest even if
 	// it does not exist on the manifest on disk.
@@ -237,17 +236,6 @@ type Storage interface {
 	// [0]).  If the function returns an error the error is immediately returned
 	// which aborts the walk.
 	WalkExtensions(ctx context.Context, fn func(manifest *VSIXManifest, versions []Version) error) error
-}
-
-// HTTPFileServer creates an http.Handler that serves files from the provided
-// storage.
-func HTTPFileServer(s Storage) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		http.FileServerFS(&contextFs{
-			ctx:  r.Context(),
-			open: s.Open,
-		}).ServeHTTP(rw, r)
-	})
 }
 
 type File struct {

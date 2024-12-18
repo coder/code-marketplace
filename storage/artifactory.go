@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path"
@@ -16,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spf13/afero/mem"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -277,37 +275,25 @@ func (s *Artifactory) AddExtension(ctx context.Context, manifest *VSIXManifest, 
 	return s.uri + dir, nil
 }
 
-// Open returns a file from Artifactory.
-// TODO: Since we only extract a subset of files perhaps if the file does not
-// exist we should download the vsix and extract the requested file as a
-// fallback.  Obviously this seems like quite a bit of overhead so we would
-// then emit a warning so we can notice that VS Code has added new asset types
-// that we should be extracting to avoid that overhead.  Other solutions could
-// be implemented though like extracting the VSIX to disk locally and only
-// going to Artifactory for the VSIX when it is missing on disk (basically
-// using the disk as a cache).
-func (s *Artifactory) Open(ctx context.Context, fp string) (fs.File, error) {
-	resp, code, err := s.read(ctx, fp)
-	if code != http.StatusOK || err != nil {
-		switch code {
-		case http.StatusNotFound:
-			return nil, fs.ErrNotExist
-		case http.StatusForbidden:
-			return nil, fs.ErrPermission
-		default:
-			return nil, err
+func (s *Artifactory) FileServer() http.Handler {
+	// TODO: Since we only extract a subset of files perhaps if the file does not
+	// exist we should download the vsix and extract the requested file as a
+	// fallback.  Obviously this seems like quite a bit of overhead so we would
+	// then emit a warning so we can notice that VS Code has added new asset types
+	// that we should be extracting to avoid that overhead.  Other solutions could
+	// be implemented though like extracting the VSIX to disk locally and only
+	// going to Artifactory for the VSIX when it is missing on disk (basically
+	// using the disk as a cache).
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		reader, code, err := s.read(r.Context(), r.URL.Path)
+		if err != nil {
+			http.Error(rw, err.Error(), code)
+			return
 		}
-	}
-
-	// TODO: Do no copy the bytes into memory, stream them rather than
-	// storing the entire file into memory.
-	f := mem.NewFileHandle(mem.CreateFile(fp))
-	_, err = io.Copy(f, resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return f, nil
+		defer reader.Close()
+		rw.WriteHeader(http.StatusOK)
+		_, _ = io.Copy(rw, reader)
+	})
 }
 
 func (s *Artifactory) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
