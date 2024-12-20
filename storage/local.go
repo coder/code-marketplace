@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -142,8 +141,8 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	return dir, nil
 }
 
-func (s *Local) Open(_ context.Context, fp string) (fs.File, error) {
-	return http.Dir(s.extdir).Open(fp)
+func (s *Local) FileServer() http.Handler {
+	return http.FileServer(http.Dir(s.extdir))
 }
 
 func (s *Local) Manifest(ctx context.Context, publisher, name string, version Version) (*VSIXManifest, error) {
