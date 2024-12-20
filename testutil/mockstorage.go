@@ -3,13 +3,9 @@ package testutil
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
-
-	"github.com/spf13/afero/mem"
 
 	"github.com/coder/code-marketplace/storage"
 )
@@ -25,15 +21,6 @@ func NewMockStorage() *MockStorage {
 
 func (s *MockStorage) AddExtension(ctx context.Context, manifest *storage.VSIXManifest, vsix []byte, extra ...storage.File) (string, error) {
 	return "", errors.New("not implemented")
-}
-func (s *MockStorage) Open(ctx context.Context, path string) (fs.File, error) {
-	if filepath.Base(path) == "nonexistent" {
-		return nil, fs.ErrNotExist
-	}
-
-	f := mem.NewFileHandle(mem.CreateFile(path))
-	_, _ = f.Write([]byte("foobar"))
-	return f, nil
 }
 
 func (s *MockStorage) FileServer() http.Handler {
