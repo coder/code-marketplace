@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [2.3.0](https://github.com/coder/code-marketplace/releases/tag/v2.3.0) - 2024-12-20
+
+### Added
+
+- Add empty signatures when starting the server with --sign. This will not work
+  with VS Code on Windows and macOS as we do not have the key required, but it
+  will work for open source versions of VS Code (VSCodium, code-server) and VS
+  Code on Linux where signatures must exist but are not actually checked.
+
+### Changed
+
+- Ignore extensions without a manifest. This is not expected in normal use, but
+  could happen if, for example, a manifest temporarily failed to download, which
+  would then crash the entire process with a segfault.
+
 ## [2.2.1](https://github.com/coder/code-marketplace/releases/tag/v2.2.1) - 2024-08-14
 
 ### Fixed

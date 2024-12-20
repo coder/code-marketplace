@@ -33,7 +33,7 @@ type Signature struct {
 
 func NewSignatureStorage(logger slog.Logger, includeEmptySignatures bool, s Storage) *Signature {
 	if includeEmptySignatures {
-		logger.Info(context.Background(), "Signature storage enabled, if using VSCode on Windows, this will not work.")
+		logger.Info(context.Background(), "Signature storage enabled, if using VS Code on Windows or macOS, this will not work.")
 	}
 	return &Signature{
 		Logger:                 logger,
