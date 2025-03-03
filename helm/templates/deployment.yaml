@@ -49,11 +49,11 @@ spec:
           {{- end }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
           args:
             - --address
-            - 0.0.0.0:80
+            - "0.0.0.0:{{ .Values.service.port }}"
             {{- if .Values.persistence.artifactory.enabled }}
             - --artifactory
             - {{ .Values.persistence.artifactory.uri }}
