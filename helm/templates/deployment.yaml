@@ -25,11 +25,16 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "code-marketplace.serviceAccountName" . }}
-      {{- if not .Values.persistence.artifactory.enabled }}
+      {{- if or (.Values.volumes) (not .Values.persistence.artifactory.enabled) }}
       volumes:
+      {{- if not .Values.persistence.artifactory.enabled }}
         - name: extensions
           persistentVolumeClaim:
             claimName: {{ include "code-marketplace.fullname" . }}
+      {{- end }}
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -63,10 +68,15 @@ spec:
             - --extensions-dir
             - /extensions
             {{- end }}
-          {{- if not .Values.persistence.artifactory.enabled }}
+          {{- if or (.Values.volumeMounts) (not .Values.persistence.artifactory.enabled) }}
           volumeMounts:
+          {{- if not .Values.persistence.artifactory.enabled }}
             - name: extensions
               mountPath: /extensions
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- end }}
           livenessProbe:
             httpGet:
