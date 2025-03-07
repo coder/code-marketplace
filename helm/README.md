@@ -54,6 +54,21 @@ $ kubectl exec -it "$POD_NAME" -- /opt/code-marketplace add https://github.com/V
 In the future it will be possible to use Artifactory for storing and retrieving
 extensions instead of a persistent volume.
 
+## Adding custom certificate authorities
+
+If the location for retrieving extensions (or if using Artifactory storage) is not signed by a common CA, then create a secret in the deployed namespace:
+```
+kubectl create secret -n $namespace generic all-cas --from-file="certificate1.pem"=/path/to/certificate1.pem \
+ --from-file="certificate2.pem"=path/to/certificate2.pem \
+ --from-file="certificate3.pem"=path/to/certificate3.pem
+```
+
+And then, set the certificates.secretName to match:
+
+```console
+$ helm upgrade --install code-marketplace ./helm-chart --set certificates.secretName "all-cas"
+```
+
 ## Uninstall
 
 To uninstall/delete the marketplace deployment:

@@ -106,3 +106,10 @@ persistence:
     repo: extensions
   # Size is ignored when using Artifactory.
   size: 100Gi
+
+# Create a secret with all additional certificate authorities, ex:
+# kubectl create secret -n $namespace generic all-cas --from-file="certificate1.pem"=/path/to/certificate1.pem \
+# --from-file="certificate2.pem"=path/to/certificate2.pem \
+# --from-file="certificate3.pem"=path/to/certificate3.pem
+certificates:
+  secretName: "" 

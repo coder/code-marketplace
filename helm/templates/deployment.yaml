@@ -31,6 +31,16 @@ spec:
         - name: extensions
           persistentVolumeClaim:
             claimName: {{ include "code-marketplace.fullname" . }}
+        {{- if .Values.certificates.secretName }}
+        - name: certs
+          secret:
+            secretName: {{ .Values.certificates.secretName }}
+        {{- end }}
+      {{- else if and .Values.persistence.artifactory.enabled .Values.certificates.secretName }}
+      volumes:
+        - name: certs
+          secret:
+            secretName: {{ .Values.certificates.secretName }}
       {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
@@ -44,6 +54,13 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.certificates.secretName }}
+          lifecycle:           
+            postStart:             
+              exec:               
+                command:              
+                  - update-ca-certificates
+          {{- end}}
           {{- if .Values.persistence.artifactory.enabled }}
           env:
             - name: "ARTIFACTORY_TOKEN"
@@ -73,6 +90,14 @@ spec:
           {{- if not .Values.persistence.artifactory.enabled }}
             - name: extensions
               mountPath: /extensions
+            {{- if .Values.certificates.secretName }}
+            - name: certs
+              mountPath: /usr/local/share/ca-certificates/
+            {{- end }}
+          {{- else if and .Values.persistence.artifactory.enabled .Values.certificates.secretName }}
+          volumeMounts:
+            - name: certs
+              mountPath: /usr/local/share/ca-certificates/
           {{- end }}
           {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}

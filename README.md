@@ -66,6 +66,10 @@ export ARTIFACTORY_TOKEN="my-token"
 The token will be used in the `Authorization` header with the value `Bearer
 <TOKEN>`.
 
+## Custom Certificate Authorities for Container Deployment
+
+If your artifactory server or extension download location is on a domain not signed by a default CA, then you will need to add those files either by volume mount or `docker cp` and then run `update-ca-certificates`.
+
 ### Exposing the marketplace
 
 The marketplace must be put behind TLS otherwise code-server will reject
