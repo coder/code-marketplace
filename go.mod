@@ -1,6 +1,7 @@
 module github.com/coder/code-marketplace
 
 go 1.22.8
+toolchain go1.23.7
 
 require (
 	cdr.dev/slog v1.6.1
@@ -11,8 +12,8 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/mod v0.19.0
-	golang.org/x/sync v0.10.0
+	golang.org/x/mod v0.24.0
+	golang.org/x/sync v0.12.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 )
 
