@@ -44,14 +44,17 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.persistence.artifactory.enabled }}
           env:
+          {{- if .Values.persistence.artifactory.enabled }}
             - name: "ARTIFACTORY_TOKEN"
               valueFrom:
                 secretKeyRef:
                   name: artifactory
                   key: token
           {{- end }}
+          {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }} 
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
