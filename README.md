@@ -134,6 +134,38 @@ remove all versions.
 ./code-marketplace remove ms-python.python --all [flags]
 ```
 
+## Scanning frequency and caching
+
+The marketplace does not utilize a database. When an extension query is made,
+the marketplace scans the local file system or queries Artifactory on demand to
+find all the available extensions.
+
+However, for Artifactory in particular this can be slow, so this full list of
+extensions is cached in memory for a default of one minute and reused for any
+subsequent requests that fall within that duration. This duration can be
+configured or disabled with `--list-cache-duration` and applies to both storage
+backends.
+
+This means that when you add or remove an extension, depending on when the last
+request was made, it can take a duration between zero and
+`--list-cache-duration` for the query response to reflect that change.
+
+Artifactory storage also uses a second in-memory cache for extension manifests,
+which are referenced in extension queries (for things like categories). This
+cache is initially populated with all available extension manifests on startup.
+Extensions added after the server is running are added to the cache on-demand
+the next time extensions are scanned.
+
+The manifest cache has no expiration and never evicts manifests because it was
+expected that extensions are typically only ever added and individual extension
+version manifests never change; however we would like to implement evicting
+manifests of extensions that have been removed.
+
+With local storage, manifests are read directly from the file system on
+demand. Requests for other extension assets (such as icons) for both storage
+backends have no cache and are read/proxied directly from the file system or
+Artifactory since they are not in the extension query hot path.
+
 ## Usage in code-server
 
 You can point code-server to your marketplace by setting the
@@ -171,7 +203,7 @@ Although not officially supported, you can follow the examples below to start us
     export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
     # Or set a product.json file in `~/.config/VSCodium/product.json`
     codium
-    ``` 
+    ```
 
 ## Missing features
 
