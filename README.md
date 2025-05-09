@@ -192,18 +192,39 @@ code-server
 If code-server reports content security policy errors ensure that the
 marketplace is running behind an https URL.
 
+### Custom certificate authority
+
+If you are using a custom certificate authority or a self-signed certificate and
+get errors like "unable to verify the first certificate", you may need to set
+the [NODE_EXTRA_CA_CERTS](https://nodejs.org/api/cli.html#node_extra_ca_certsfile)
+environment variable for code-server to find your certificates bundle.
+
+Make sure your bundle contains the full certificate chain. This can be necessary
+because Node does not read system certificates by default and while VS Code has
+code for reading them, it appears not to work or be enabled for the web version.
+
+Some so-called "web" extensions (like `vscodevim.vim`) are installed in the
+browser, and extension searches are also performed from the browser, so your
+certificate bundle may also need to be installed on the client machine in
+addition to the remote machine.
+
 ## Usage in VS Code & VSCodium
 
-Although not officially supported, you can follow the examples below to start using code-marketplace with VS Code and VSCodium:
+Although not officially supported, you can follow the examples below to start
+using code-marketplace with VS Code and VSCodium:
 
 - [VS Code](https://github.com/eclipse/openvsx/wiki/Using-Open-VSX-in-VS-Code)
+
+  Extension signing may have to be disabled in VS Code.
+
 - [VSCodium](https://github.com/VSCodium/vscodium/blob/master/docs/index.md#howto-switch-marketplace)
+
   ```
-    export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api
-    export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
-    # Or set a product.json file in `~/.config/VSCodium/product.json`
-    codium
-    ```
+  export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api
+  export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
+  # Or set a product.json file in `~/.config/VSCodium/product.json`
+  codium
+  ```
 
 ## Missing features
 
