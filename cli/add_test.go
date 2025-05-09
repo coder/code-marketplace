@@ -145,7 +145,7 @@ func TestAdd(t *testing.T) {
 				args := []string{"add", source, "--extensions-dir", extdir}
 				cmd.SetArgs(args)
 				buf := new(bytes.Buffer)
-				cmd.SetOutput(buf)
+				cmd.SetOut(buf)
 
 				err := cmd.Execute()
 				output := buf.String()

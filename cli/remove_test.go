@@ -159,7 +159,7 @@ func TestRemove(t *testing.T) {
 			}
 			cmd.SetArgs(args)
 			buf := new(bytes.Buffer)
-			cmd.SetOutput(buf)
+			cmd.SetOut(buf)
 
 			err := cmd.Execute()
 			output := buf.String()
