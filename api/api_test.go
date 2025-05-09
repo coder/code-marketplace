@@ -305,7 +305,8 @@ func TestAPI(t *testing.T) {
 
 			var resp *http.Response
 			var err error
-			if method == http.MethodPost {
+			switch method {
+			case http.MethodPost:
 				var body []byte
 				if str, ok := c.Request.(string); ok {
 					body = []byte(str)
@@ -314,9 +315,9 @@ func TestAPI(t *testing.T) {
 					require.NoError(t, err)
 				}
 				resp, err = client.Post(url, "application/json", bytes.NewReader(body))
-			} else if method == http.MethodGet {
+			case http.MethodGet:
 				resp, err = client.Get(url)
-			} else {
+			default:
 				t.Fatal(method + " is not handled in the test yet, please add it now")
 			}
 			require.NoError(t, err)
