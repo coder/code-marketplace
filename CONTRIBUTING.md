@@ -4,7 +4,7 @@
 
 ```console
 mkdir extensions
-go run ./cmd/marketplace/main.go server [flags]
+go run ./cmd/marketplace/main.go server --extensions-dir ./extensions
 ```
 
 When you make a change that affects people deploying the marketplace please
