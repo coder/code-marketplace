@@ -1070,7 +1070,7 @@ func testVersions(t *testing.T, factory storageFactory) {
 	}
 }
 
-func TestExtensionID(t *testing.T) {
+func TestExtensionIDFromManifest(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -1101,6 +1101,69 @@ func TestExtensionID(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, test.expected, storage.ExtensionIDFromManifest(test.manifest))
+		})
+	}
+}
+
+func TestExtensionIDWithVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// expected is the expected id.
+		expected string
+		// publisher is the publisher of the extension.
+		publisher string
+		// extension is name of the extension.
+		extension string
+		// version is version of the extension.
+		version string
+		// name is the name of the test.
+		name string
+	}{
+		{
+			name:      "OK",
+			expected:  "foo.bar@baz",
+			publisher: "foo",
+			version:   "baz",
+			extension: "bar",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, test.expected, storage.ExtensionIDWithVersion(test.publisher, test.extension, test.version))
+		})
+	}
+}
+
+func TestExtensionIDWithoutVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// expected is the expected id.
+		expected string
+		// publisher is the publisher of the extension.
+		publisher string
+		// extension is name of the extension.
+		extension string
+		// name is the name of the test.
+		name string
+	}{
+		{
+			name:      "OK",
+			expected:  "foo.bar",
+			publisher: "foo",
+			extension: "bar",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, test.expected, storage.ExtensionIDWithoutVersion(test.publisher, test.extension))
 		})
 	}
 }

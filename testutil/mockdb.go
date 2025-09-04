@@ -41,5 +41,11 @@ func (db *MockDB) GetExtensions(ctx context.Context, filter database.Filter, fla
 	if len(filter.Criteria) == 0 {
 		return nil, 0, nil
 	}
+	if len(filter.Criteria) > 1 && filter.Criteria[1].Type == database.ExtensionName {
+		if strings.HasPrefix(filter.Criteria[1].Value, "notexist") {
+			return nil, 0, nil
+		}
+		return db.exts[:1], 1, nil
+	}
 	return db.exts, len(db.exts), nil
 }

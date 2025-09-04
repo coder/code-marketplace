@@ -128,6 +128,9 @@ func New(options *Options) *API {
 	r.Get("/publishers/{publisher}/vsextensions/{extension}/{version}/{type}", api.assetRedirect)
 	r.Get("/api/publishers/{publisher}/vsextensions/{extension}/{version}/{type}", api.assetRedirect)
 
+	// Return the specified extension with only the latest version included.
+	r.Get("/api/vscode/{publisher}/{extension}/latest", api.latestExtension)
+
 	// This is the URL you get taken to when you click the extension's names,
 	// ratings, etc from the extension details page.
 	r.Get("/item", func(rw http.ResponseWriter, r *http.Request) {
@@ -255,4 +258,49 @@ func (api *API) assetRedirect(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(rw, r, url, http.StatusMovedPermanently)
+}
+
+func (api *API) latestExtension(rw http.ResponseWriter, r *http.Request) {
+	baseURL := httpapi.RequestBaseURL(r, "/")
+	filter := database.Filter{
+		Criteria: []database.Criteria{
+			{
+				Type:  database.Target,
+				Value: "Microsoft.VisualStudio.Code",
+			},
+			{
+				// ExtensionName is the fully qualified name `publisher.extension`.
+				Type:  database.ExtensionName,
+				Value: storage.ExtensionIDWithoutVersion(chi.URLParam(r, "publisher"), chi.URLParam(r, "extension")),
+			},
+		},
+		PageNumber: 1,
+		PageSize:   1,
+	}
+	flags := database.IncludeVersions |
+		database.IncludeFiles |
+		database.IncludeCategoryAndTags |
+		database.IncludeVersionProperties |
+		database.IncludeAssetURI |
+		database.IncludeStatistics |
+		database.IncludeLatestVersionOnly
+	extensions, _, err := api.Database.GetExtensions(r.Context(), filter, flags, baseURL)
+	if err != nil {
+		httpapi.Write(rw, http.StatusInternalServerError, httpapi.ErrorResponse{
+			Message:   "Unable to read extension",
+			Detail:    "Contact an administrator with the request ID",
+			RequestID: httpmw.RequestID(r),
+		})
+		return
+	}
+	if len(extensions) == 0 {
+		httpapi.Write(rw, http.StatusNotFound, httpapi.ErrorResponse{
+			Message:   "Extension does not exist",
+			Detail:    "Please check the publisher and extension name",
+			RequestID: httpmw.RequestID(r),
+		})
+		return
+	}
+
+	httpapi.Write(rw, http.StatusOK, extensions[0])
 }

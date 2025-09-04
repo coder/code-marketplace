@@ -385,16 +385,22 @@ func ReadVSIX(ctx context.Context, source string) ([]byte, error) {
 // ExtensionIDFromManifest returns the full ID of an extension without the the
 // platform, for example publisher.name@0.0.1.
 func ExtensionIDFromManifest(manifest *VSIXManifest) string {
-	return ExtensionID(
+	return ExtensionIDWithVersion(
 		manifest.Metadata.Identity.Publisher,
 		manifest.Metadata.Identity.ID,
 		manifest.Metadata.Identity.Version)
 }
 
-// ExtensionID returns the full ID of an extension without the platform, for
+// ExtensionIDWithVersion returns the full ID of an extension without the platform, for
 // example publisher.name@0.0.1.
-func ExtensionID(publisher, name, version string) string {
+func ExtensionIDWithVersion(publisher, name, version string) string {
 	return fmt.Sprintf("%s.%s@%s", publisher, name, version)
+}
+
+// ExtensionID returns the full ID of an extension without the platform or
+// version, for example publisher.name.
+func ExtensionIDWithoutVersion(publisher, name string) string {
+	return fmt.Sprintf("%s.%s", publisher, name)
 }
 
 // ExtensionVSIXNameFromManifest returns the full ID of an extension including

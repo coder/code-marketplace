@@ -24,7 +24,7 @@ func TestAPI(t *testing.T) {
 	t.Parallel()
 
 	exts := []*database.Extension{}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		exts = append(exts, &database.Extension{
 			ID: fmt.Sprintf("extension-%d", i),
 		})
@@ -266,6 +266,23 @@ func TestAPI(t *testing.T) {
 			Path:   "/api/publishers/vscodevim/extensions/vim/1.23.1/stats?statType=1",
 			Status: http.StatusOK,
 		},
+		{
+			Name:   "LatestExtensionNotExist",
+			Path:   "/api/vscode/notexist/nope/latest",
+			Method: http.MethodGet,
+			Status: http.StatusNotFound,
+			Response: &httpapi.ErrorResponse{
+				Message: "Extension does not exist",
+				Detail:  "Please check the publisher and extension name",
+			},
+		},
+		{
+			Name:     "LatestExtensionExists",
+			Path:     "/api/vscode/vscodevim/vim/latest",
+			Method:   http.MethodGet,
+			Status:   http.StatusOK,
+			Response: exts[0],
+		},
 	}
 
 	for _, c := range cases {
@@ -324,11 +341,11 @@ func TestAPI(t *testing.T) {
 			require.Equal(t, c.Status, resp.StatusCode)
 
 			if c.Response != nil {
-				// Copy the request ID so the objects can match.
 				if a, aok := c.Response.(*httpapi.ErrorResponse); aok {
 					var body httpapi.ErrorResponse
 					err := json.NewDecoder(resp.Body).Decode(&body)
 					require.NoError(t, err)
+					// Copy the request ID so the objects can match.
 					a.RequestID = body.RequestID
 					require.Equal(t, c.Response, &body)
 				} else if c.Status == http.StatusMovedPermanently {
@@ -337,6 +354,11 @@ func TestAPI(t *testing.T) {
 					b, err := io.ReadAll(resp.Body)
 					require.NoError(t, err)
 					require.Equal(t, a, string(b))
+				} else if _, aok := c.Response.(*database.Extension); aok {
+					var body database.Extension
+					err := json.NewDecoder(resp.Body).Decode(&body)
+					require.NoError(t, err)
+					require.Equal(t, c.Response, &body)
 				} else {
 					var body api.QueryResponse
 					err := json.NewDecoder(resp.Body).Decode(&body)

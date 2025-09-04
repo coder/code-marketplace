@@ -58,6 +58,7 @@ func (db *NoDB) GetExtensions(ctx context.Context, filter Filter, flags Flag, ba
 	start := time.Now()
 	err := db.Storage.WalkExtensions(ctx, func(manifest *storage.VSIXManifest, versions []storage.Version) error {
 		vscodeExt := convertManifestToExtension(manifest)
+		// TODO: Could return early if ExtensionID or ExtensionName match.
 		if matched, distances := getMatches(vscodeExt, filter); matched {
 			vscodeExt.versions = versions
 			vscodeExt.distances = distances
@@ -134,7 +135,8 @@ func getMatches(extension *noDBExtension, filter Filter) (bool, []int) {
 			match(containsFold(extension.Categories, c.Value))
 		case ExtensionName:
 			// The value here is the fully qualified name `publisher.extension`.
-			match(strings.EqualFold(extension.Publisher.PublisherName+"."+extension.Name, c.Value))
+			name := storage.ExtensionIDWithoutVersion(extension.Publisher.PublisherName, extension.Name)
+			match(strings.EqualFold(name, c.Value))
 		case Target:
 			// Unlike the other criteria the target is an AND so if it does not match
 			// we can abort early.

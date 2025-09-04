@@ -102,7 +102,7 @@ func NewArtifactoryStorage(ctx context.Context, options *ArtifactoryOptions) (*A
 				if err != nil && !errors.Is(err, context.Canceled) {
 					return err
 				} else if err != nil {
-					id := ExtensionID(identity.Publisher, identity.ID, ver.Version)
+					id := ExtensionIDWithVersion(identity.Publisher, identity.ID, ver.Version)
 					s.logger.Error(ctx, "Unable to read extension manifest", slog.Error(err),
 						slog.F("id", id),
 						slog.F("targetPlatform", ver.TargetPlatform))
@@ -400,7 +400,7 @@ func (s *Artifactory) WalkExtensions(ctx context.Context, fn func(manifest *VSIX
 			if err != nil && errors.Is(err, context.Canceled) {
 				return err
 			} else if err != nil {
-				id := ExtensionID(ext.publisher, ext.name, ext.versions[0].Version)
+				id := ExtensionIDWithVersion(ext.publisher, ext.name, ext.versions[0].Version)
 				s.logger.Error(ctx, "Unable to read extension manifest; extension will be ignored", slog.Error(err),
 					slog.F("id", id),
 					slog.F("targetPlatform", ext.versions[0].TargetPlatform))

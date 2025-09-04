@@ -165,7 +165,7 @@ func TestAdd(t *testing.T) {
 					_, err := os.Stat(dest)
 					require.NoError(t, err)
 					// Should tell you where it went.
-					id := storage.ExtensionID(ext.Publisher, ext.Name, ext.LatestVersion)
+					id := storage.ExtensionIDWithVersion(ext.Publisher, ext.Name, ext.LatestVersion)
 					require.Contains(t, output, fmt.Sprintf("Unpacked %s to %s", id, dest))
 					// Should mention the dependencies and pack.
 					require.Contains(t, output, fmt.Sprintf("%s has %d dep", id, len(ext.Dependencies)))
