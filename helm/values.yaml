@@ -12,6 +12,12 @@ image:
 
 extraEnv: []
 
+# Enables the `--verbose` command parameter to enable debug level logging.
+verboseLogging: false
+
+# Enables code-marketplace to add empty signatures to extensions per https://github.com/coder/code-marketplace/pull/84
+extensionSigning: false
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
