@@ -11,6 +11,8 @@ spec:
   selector:
     matchLabels:
       {{- include "code-marketplace.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate
   template:
     metadata:
       {{- with .Values.podAnnotations }}
