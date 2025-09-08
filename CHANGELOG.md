@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Expose the `--verbose` and `--sign` runtime parameters as Helm variables.
+
 ## [2.4.0](https://github.com/coder/code-marketplace/releases/tag/v2.4.0) - 2025-09-04
 
 ### Added
