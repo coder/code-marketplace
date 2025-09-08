@@ -72,6 +72,12 @@ spec:
             {{- else }}
             - --extensions-dir
             - /extensions
+            {{- if .Values.verboseLogging }}
+            - --verbose
+            {{- end }}
+            {{- if .Values.extensionSigning }}
+            - --sign
+            {{- end }}
             {{- end }}
           {{- if or (.Values.volumeMounts) (not .Values.persistence.artifactory.enabled) }}
           volumeMounts:
