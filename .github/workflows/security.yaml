@@ -46,8 +46,8 @@ jobs:
         with:
           category: "/language:go"
 
-  trivy-repo:
-    name: Trivy Filesystem Scan
+  trivy:
+    name: Trivy Docker Image Scan
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -56,18 +56,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner in repo mode
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build binary for linux/amd64
+        run: |
+          TAG=$(git describe --always)
+          mkdir -p bin
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=${TAG}" \
+            -o bin/code-marketplace-linux-amd64 \
+            ./cmd/marketplace/main.go
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        id: build
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag code-marketplace:scan \
+            --load \
+            --build-arg TARGETARCH=amd64 \
+            .
+          echo "image=code-marketplace:scan" >> "$GITHUB_OUTPUT"
+
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          scan-type: "fs"
-          scan-ref: "."
+          image-ref: ${{ steps.build.outputs.image }}
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "LOW,MEDIUM,HIGH,CRITICAL"
-          scanners: "vuln,secret,misconfig"
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results.sarif"
-          category: "Trivy-Filesystem"
+          category: "Trivy"
