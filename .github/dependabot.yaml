@@ -7,6 +7,8 @@ updates:
       time: "06:00"
       timezone: "America/Chicago"
     labels: []
+    commit-message:
+      prefix: "ci"
     groups:
       github-actions:
         patterns:
@@ -19,8 +21,15 @@ updates:
       time: "06:00"
       timezone: "America/Chicago"
     labels: []
+    commit-message:
+      prefix: "chore"
     open-pull-requests-limit: 15
     groups:
       x:
         patterns:
           - "golang.org/x/*"
+    ignore:
+      # Ignore patch updates for all dependencies to reduce PR noise
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-patch

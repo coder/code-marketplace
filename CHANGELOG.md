@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Automated security scanning workflows for improved supply chain security:
+  - CodeQL analysis for Go code vulnerability scanning
+  - Trivy scanning for Go dependencies and Docker images
+  - OpenSSF Scorecard for security best practices assessment
+  - Results uploaded to GitHub Security tab for centralized monitoring
+
+### Changed
+
+- Enhanced Dependabot configuration with commit message prefixes and patch update
+  filtering to reduce PR noise while maintaining security update coverage.
 - Update the Kubernetes Deployment `spec.strategy.type` field to be of type `Recreate`
   in order to properly handle upgrades/restarts as the default deployment creates a PVC
   of type `ReadWriteOnce` and could only be assigned to one replica.
