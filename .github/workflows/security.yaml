@@ -84,7 +84,14 @@ jobs:
             .
           echo "image=code-marketplace:scan" >> "$GITHUB_OUTPUT"
 
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner (table output for logs)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.build.outputs.image }}
+          format: "table"
+          severity: "LOW,MEDIUM,HIGH,CRITICAL"
+
+      - name: Run Trivy vulnerability scanner (SARIF output for GitHub)
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ steps.build.outputs.image }}
@@ -97,3 +104,10 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
           category: "Trivy"
+
+      - name: Upload Trivy scan results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          retention-days: 7
