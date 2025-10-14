@@ -27,6 +27,11 @@ upload:
 
 TAG=$(shell git describe --always)
 
+build/linux/amd64:
+	mkdir -p bin
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-linux-amd64 ./cmd/marketplace/main.go
+.PHONY: build/linux/amd64
+
 build:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-mac-amd64 ./cmd/marketplace/main.go
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-mac-arm64 ./cmd/marketplace/main.go

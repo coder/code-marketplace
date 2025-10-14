@@ -62,13 +62,7 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Build binary for linux/amd64
-        run: |
-          TAG=$(git describe --always)
-          mkdir -p bin
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=${TAG}" \
-            -o bin/code-marketplace-linux-amd64 \
-            ./cmd/marketplace/main.go
+        run: make build/linux/amd64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -76,12 +70,11 @@ jobs:
       - name: Build Docker image
         id: build
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --tag code-marketplace:scan \
-            --load \
-            --build-arg TARGETARCH=amd64 \
-            .
+          docker buildx bake \
+            -f ./docker-bake.hcl \
+            --set "*.platform=linux/amd64" \
+            --set "*.tags=code-marketplace:scan" \
+            --load
           echo "image=code-marketplace:scan" >> "$GITHUB_OUTPUT"
 
       - name: Run Trivy vulnerability scanner (table output for logs)
