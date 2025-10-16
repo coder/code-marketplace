@@ -13,6 +13,35 @@ This marketplace reads extensions from file storage and provides an API for
 editors to consume. It does not have a frontend or any mechanisms for extension
 authors to add or update extensions in the marketplace.
 
+## Development
+
+### Requirements
+
+- Go 1.21 or later
+- GNU Make 4.3 or later (for recursive glob support in build targets)
+
+### Building from source
+
+Build all platform binaries:
+
+```console
+make build
+```
+
+Build a specific platform:
+
+```console
+make bin/code-marketplace-linux-amd64
+```
+
+Available targets:
+- `bin/code-marketplace-mac-amd64`
+- `bin/code-marketplace-mac-arm64`
+- `bin/code-marketplace-linux-amd64`
+- `bin/code-marketplace-linux-arm64`
+- `bin/code-marketplace-windows-amd64`
+- `bin/code-marketplace-windows-arm64`
+
 ## Deployment
 
 The marketplace is a single binary. Deployment involves running the binary,
@@ -219,7 +248,7 @@ using code-marketplace with VS Code and VSCodium:
 
 - [VSCodium](https://github.com/VSCodium/vscodium/blob/master/docs/index.md#howto-switch-marketplace)
 
-  ```
+  ```console
   export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api
   export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
   # Or set a product.json file in `~/.config/VSCodium/product.json`
