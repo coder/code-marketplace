@@ -22,8 +22,8 @@ make bin/code-marketplace-linux-amd64
 ```
 
 Available targets:
-- `bin/code-marketplace-mac-amd64`
-- `bin/code-marketplace-mac-arm64`
+- `bin/code-marketplace-darwin-amd64`
+- `bin/code-marketplace-darwin-arm64`
 - `bin/code-marketplace-linux-amd64`
 - `bin/code-marketplace-linux-arm64`
 - `bin/code-marketplace-windows-amd64`
