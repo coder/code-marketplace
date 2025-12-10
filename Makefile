@@ -26,12 +26,34 @@ upload:
 .PHONY: gen
 
 TAG=$(shell git describe --always)
+GO_SRC=$(shell find . -name '*.go' -type f)
+LDFLAGS=-ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)"
+$(shell mkdir -p bin)
 
-build:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-mac-amd64 ./cmd/marketplace/main.go
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-mac-arm64 ./cmd/marketplace/main.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-linux-amd64 ./cmd/marketplace/main.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-linux-arm64 ./cmd/marketplace/main.go
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-windows-amd64 ./cmd/marketplace/main.go
-	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "-X github.com/coder/code-marketplace/buildinfo.tag=$(TAG)" -o bin/code-marketplace-windows-arm64 ./cmd/marketplace/main.go
+# Individual build targets for each OS/arch combination
+bin/code-marketplace-darwin-amd64: $(GO_SRC) go.mod go.sum
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o "$@" ./cmd/marketplace/main.go
+
+bin/code-marketplace-darwin-arm64: $(GO_SRC) go.mod go.sum
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o "$@" ./cmd/marketplace/main.go
+
+bin/code-marketplace-linux-amd64: $(GO_SRC) go.mod go.sum
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o "$@" ./cmd/marketplace/main.go
+
+bin/code-marketplace-linux-arm64: $(GO_SRC) go.mod go.sum
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o "$@" ./cmd/marketplace/main.go
+
+bin/code-marketplace-windows-amd64: $(GO_SRC) go.mod go.sum
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o "$@" ./cmd/marketplace/main.go
+
+bin/code-marketplace-windows-arm64: $(GO_SRC) go.mod go.sum
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build $(LDFLAGS) -o "$@" ./cmd/marketplace/main.go
+
+# Main build target - builds all platforms
+build: bin/code-marketplace-darwin-amd64 \
+       bin/code-marketplace-darwin-arm64 \
+       bin/code-marketplace-linux-amd64 \
+       bin/code-marketplace-linux-arm64 \
+       bin/code-marketplace-windows-amd64 \
+       bin/code-marketplace-windows-arm64
 .PHONY: build

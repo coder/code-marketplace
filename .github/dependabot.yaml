@@ -21,6 +21,6 @@ updates:
     labels: []
     open-pull-requests-limit: 15
     groups:
-      x:
+      all-dependencies:
         patterns:
-          - "golang.org/x/*"
+          - "*"

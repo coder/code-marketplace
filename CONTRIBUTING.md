@@ -2,6 +2,35 @@
 
 ## Development
 
+### Requirements
+
+- Go 1.21 or later
+- GNU Make
+
+### Building from source
+
+Build all platform binaries:
+
+```console
+make build
+```
+
+Build a specific platform:
+
+```console
+make bin/code-marketplace-linux-amd64
+```
+
+Available targets:
+- `bin/code-marketplace-darwin-amd64`
+- `bin/code-marketplace-darwin-arm64`
+- `bin/code-marketplace-linux-amd64`
+- `bin/code-marketplace-linux-arm64`
+- `bin/code-marketplace-windows-amd64`
+- `bin/code-marketplace-windows-arm64`
+
+### Running locally
+
 ```console
 mkdir extensions
 go run ./cmd/marketplace/main.go server --extensions-dir ./extensions

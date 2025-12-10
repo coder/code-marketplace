@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
 - Update the Kubernetes Deployment `spec.strategy.type` field to be of type `Recreate`
   in order to properly handle upgrades/restarts as the default deployment creates a PVC
   of type `ReadWriteOnce` and could only be assigned to one replica.
