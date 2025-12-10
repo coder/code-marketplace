@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [2.4.1](https://github.com/coder/code-marketplace/releases/tag/v2.4.1) - 2025-12-09
+
+### Security
+
+- Updated Go version to 1.24.11 to address a CVE.
+
 ### Changed
 
 - Update the Kubernetes Deployment `spec.strategy.type` field to be of type `Recreate`
