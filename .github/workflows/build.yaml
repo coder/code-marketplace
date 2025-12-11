@@ -39,6 +39,11 @@ jobs:
 
       - run: make build
 
+      - name: Generate checksums
+        run: |
+          cd bin
+          sha256sum * > code-marketplace_${{ github.ref_name }}_checksums.txt
+
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
