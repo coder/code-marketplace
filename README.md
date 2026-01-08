@@ -220,7 +220,7 @@ using code-marketplace with VS Code and VSCodium:
 - [VSCodium](https://github.com/VSCodium/vscodium/blob/master/docs/index.md#howto-switch-marketplace)
 
   ```console
-  export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api
+  export VSCODE_GALLERY_SERVICE_URL="https://<domain>/api"
   export VSCODE_GALLERY_ITEM_URL="https://<domain>/item"
   # Or set a product.json file in `~/.config/VSCodium/product.json`
   codium
