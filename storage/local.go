@@ -94,6 +94,7 @@ func (s *Local) list(ctx context.Context) []extension {
 	return list
 }
 
+
 func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix []byte, extra ...File) (string, error) {
 	// Extract the zip to the correct path.
 	identity := manifest.Metadata.Identity
@@ -101,13 +102,24 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 		Version:        identity.Version,
 		TargetPlatform: identity.TargetPlatform,
 	}.String())
-	err := easyzip.ExtractZip(vsix, func(name string, r io.Reader) error {
-		path := filepath.Join(dir, name)
-		err := os.MkdirAll(filepath.Dir(path), 0o755)
-		if err != nil {
+
+	// Ensure the target directory exists before opening a root on it.
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	// os.Root restricts all file operations to dir, preventing path traversal
+	// via ".." components, absolute paths, and symlink escapes (Go 1.24+).
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
+
+	err = easyzip.ExtractZip(vsix, func(name string, r io.Reader) error {
+		if err := root.MkdirAll(filepath.Dir(name), 0o755); err != nil {
 			return err
 		}
-		w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+		w, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 		if err != nil {
 			return err
 		}
@@ -120,21 +132,29 @@ func (s *Local) AddExtension(ctx context.Context, manifest *VSIXManifest, vsix [
 	}
 
 	// Copy the VSIX itself as well.
-	vsixPath := filepath.Join(dir, fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest)))
-	err = os.WriteFile(vsixPath, vsix, 0o644)
+	vsixName := fmt.Sprintf("%s.vsix", ExtensionVSIXNameFromManifest(manifest))
+	w, err := root.OpenFile(vsixName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return "", err
+	}
+	_, err = w.Write(vsix)
+	w.Close()
 	if err != nil {
 		return "", err
 	}
 
 	for _, file := range extra {
-		path := filepath.Join(dir, file.RelativePath)
-		err := os.MkdirAll(filepath.Dir(path), 0o755)
-		if err != nil {
+		if err := root.MkdirAll(filepath.Dir(file.RelativePath), 0o755); err != nil {
 			return "", err
 		}
-		err = os.WriteFile(path, file.Content, 0o644)
+		w, err := root.OpenFile(file.RelativePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 		if err != nil {
-			return dir, xerrors.Errorf("write extra file %q: %w", path, err)
+			return dir, xerrors.Errorf("write extra file %q: %w", file.RelativePath, err)
+		}
+		_, err = w.Write(file.Content)
+		w.Close()
+		if err != nil {
+			return dir, xerrors.Errorf("write extra file %q: %w", file.RelativePath, err)
 		}
 	}
 

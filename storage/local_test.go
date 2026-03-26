@@ -19,6 +19,7 @@ func localFactory(t *testing.T) testStorage {
 	require.NoError(t, err)
 	return testStorage{
 		storage: s,
+		dir:     extdir,
 		write: func(content []byte, elem ...string) {
 			dest := filepath.Join(extdir, filepath.Join(elem...))
 			err := os.MkdirAll(filepath.Dir(dest), 0o755)
