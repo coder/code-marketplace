@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- Prevent relative and absolute paths in zip files from being able to break out
-  of the extension directory root.
+- Prevent relative, absolute, and symlinked paths in zip files from being able
+  to break out of the extension directory root.
 
 ## [2.4.1](https://github.com/coder/code-marketplace/releases/tag/v2.4.1) - 2025-12-09
 
