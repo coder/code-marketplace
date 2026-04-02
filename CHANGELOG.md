@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [2.4.2](https://github.com/coder/code-server/releases/tag/v2.4.2) - 2026-04-02
+## [2.4.2](https://github.com/coder/code-marketplace/releases/tag/v2.4.2) - 2026-04-02
 
 ### Security
 
