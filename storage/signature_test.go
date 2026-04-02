@@ -30,6 +30,7 @@ func signed(signer bool, factory func(t *testing.T) testStorage) func(t *testing
 			storage:          storage.NewSignatureStorage(slog.Make(), key, st.storage),
 			write:            st.write,
 			exists:           st.exists,
+			dir:              st.dir,
 			expectedManifest: exp,
 		}
 	}

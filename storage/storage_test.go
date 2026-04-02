@@ -1,6 +1,8 @@
 package storage_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -25,6 +27,8 @@ type testStorage struct {
 	storage storage.Storage
 	write   func(content []byte, elem ...string)
 	exists  func(elem ...string) bool
+	// dir is the base extension directory (local storage only).
+	dir string
 
 	expectedManifest func(man *storage.VSIXManifest)
 }
@@ -123,20 +127,23 @@ func TestNewStorage(t *testing.T) {
 func TestStorage(t *testing.T) {
 	t.Parallel()
 	factories := []struct {
-		name    string
-		factory storageFactory
+		name      string
+		factory   storageFactory
+		localOnly bool
 	}{
 		{
-			name:    "Local",
-			factory: localFactory,
+			name:      "Local",
+			factory:   localFactory,
+			localOnly: true,
 		},
 		{
 			name:    "Artifactory",
 			factory: artifactoryFactory,
 		},
 		{
-			name:    "SignedLocal",
-			factory: signed(true, localFactory),
+			name:      "SignedLocal",
+			factory:   signed(true, localFactory),
+			localOnly: true,
 		},
 		{
 			name:    "SignedArtifactory",
@@ -148,6 +155,23 @@ func TestStorage(t *testing.T) {
 			t.Run("AddExtension", func(t *testing.T) {
 				testAddExtension(t, sf.factory)
 			})
+			if sf.localOnly {
+				t.Run("AddExtensionZipTraversal", func(t *testing.T) {
+					testAddExtensionZipTraversal(t, sf.factory)
+				})
+				t.Run("AddExtensionExtraTraversal", func(t *testing.T) {
+					testAddExtensionExtraTraversal(t, sf.factory)
+				})
+				t.Run("AddExtensionZipAbsolutePath", func(t *testing.T) {
+					testAddExtensionZipAbsolutePath(t, sf.factory)
+				})
+				t.Run("AddExtensionExtraAbsolutePath", func(t *testing.T) {
+					testAddExtensionExtraAbsolutePath(t, sf.factory)
+				})
+				t.Run("AddExtensionSymlinkEscape", func(t *testing.T) {
+					testAddExtensionSymlinkEscape(t, sf.factory)
+				})
+			}
 			t.Run("RemoveExtension", func(t *testing.T) {
 				testRemoveExtension(t, sf.factory)
 			})
@@ -925,6 +949,96 @@ func testAddExtension(t *testing.T, factory storageFactory) {
 			}
 		})
 	}
+}
+
+// createTraversalVSIX returns a valid zip whose sole entry has a path-traversal
+// name, used to test zip-slip protection in AddExtension.
+func createTraversalVSIX(t *testing.T, entryName string) []byte {
+	t.Helper()
+	buf := bytes.NewBuffer(nil)
+	zw := zip.NewWriter(buf)
+	fw, err := zw.Create(entryName)
+	require.NoError(t, err)
+	_, err = fw.Write([]byte("evil"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	return buf.Bytes()
+}
+
+func testAddExtensionZipTraversal(t *testing.T, factory storageFactory) {
+	t.Parallel()
+
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	manifest := testutil.ConvertExtensionToManifest(ext, storage.Version{Version: ext.LatestVersion})
+	vsix := createTraversalVSIX(t, "../../../../tmp/evil")
+	_, err := f.storage.AddExtension(context.Background(), manifest, vsix)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "path escapes from parent")
+}
+
+func testAddExtensionExtraTraversal(t *testing.T, factory storageFactory) {
+	t.Parallel()
+
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	manifest := testutil.ConvertExtensionToManifest(ext, storage.Version{Version: ext.LatestVersion})
+	vsix := testutil.CreateVSIXFromManifest(t, manifest)
+	evil := storage.File{RelativePath: "../../../../tmp/evil", Content: []byte("evil")}
+	_, err := f.storage.AddExtension(context.Background(), manifest, vsix, evil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "path escapes from parent")
+}
+
+func testAddExtensionZipAbsolutePath(t *testing.T, factory storageFactory) {
+	t.Parallel()
+
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	manifest := testutil.ConvertExtensionToManifest(ext, storage.Version{Version: ext.LatestVersion})
+	vsix := createTraversalVSIX(t, "/tmp/evil")
+	_, err := f.storage.AddExtension(context.Background(), manifest, vsix)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "path escapes from parent")
+}
+
+func testAddExtensionExtraAbsolutePath(t *testing.T, factory storageFactory) {
+	t.Parallel()
+
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	manifest := testutil.ConvertExtensionToManifest(ext, storage.Version{Version: ext.LatestVersion})
+	vsix := testutil.CreateVSIXFromManifest(t, manifest)
+	evil := storage.File{RelativePath: "/tmp/evil", Content: []byte("evil")}
+	_, err := f.storage.AddExtension(context.Background(), manifest, vsix, evil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "path escapes from parent")
+}
+
+func testAddExtensionSymlinkEscape(t *testing.T, factory storageFactory) {
+	t.Parallel()
+
+	f := factory(t)
+	ext := testutil.Extensions[0]
+	manifest := testutil.ConvertExtensionToManifest(ext, storage.Version{Version: ext.LatestVersion})
+	vsix := testutil.CreateVSIXFromManifest(t, manifest)
+
+	// Pre-create the extension directory and plant a symlink inside it that
+	// points to a directory outside the root.  An extra file written through
+	// this symlink must be rejected by os.Root's symlink-escape protection.
+	identity := manifest.Metadata.Identity
+	extDir := filepath.Join(f.dir, identity.Publisher, identity.ID, identity.Version)
+	require.NoError(t, os.MkdirAll(extDir, 0o755))
+	outside := t.TempDir()
+	require.NoError(t, os.Symlink(outside, filepath.Join(extDir, "link")))
+
+	evil := storage.File{RelativePath: "link/evil", Content: []byte("evil")}
+	_, err := f.storage.AddExtension(context.Background(), manifest, vsix, evil)
+	require.Error(t, err)
+
+	// Confirm the file was not written to the target outside the root.
+	_, statErr := os.Stat(filepath.Join(outside, "evil"))
+	require.True(t, os.IsNotExist(statErr))
 }
 
 func testRemoveExtension(t *testing.T, factory storageFactory) {
