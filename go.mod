@@ -4,15 +4,15 @@ go 1.25.8
 
 require (
 	cdr.dev/slog v1.6.1
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httprate v0.15.0
 	github.com/google/uuid v1.6.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/mod v0.33.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/mod v0.36.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 )
 
