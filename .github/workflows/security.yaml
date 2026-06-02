@@ -82,14 +82,14 @@ jobs:
           echo "image=code-marketplace:scan" >> "$GITHUB_OUTPUT"
 
       - name: Run Trivy vulnerability scanner (table output for logs)
-        uses: aquasecurity/trivy-action@314ff8b43182423b84c50b1670b0e10f858f2d98 # v0.34.2
+        uses: aquasecurity/trivy-action@bfa4b33a029b9aa80ddb784b45574c30e072c59e # v0.34.2
         with:
           image-ref: ${{ steps.build.outputs.image }}
           format: "table"
           severity: "LOW,MEDIUM,HIGH,CRITICAL"
 
       - name: Run Trivy vulnerability scanner (SARIF output for GitHub)
-        uses: aquasecurity/trivy-action@314ff8b43182423b84c50b1670b0e10f858f2d98 # v0.34.2
+        uses: aquasecurity/trivy-action@bfa4b33a029b9aa80ddb784b45574c30e072c59e # v0.34.2
         with:
           image-ref: ${{ steps.build.outputs.image }}
           format: "sarif"
