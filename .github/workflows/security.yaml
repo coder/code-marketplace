@@ -29,22 +29,22 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
           persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: go
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           category: "/language:go"
 
@@ -56,12 +56,12 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
           persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
 
@@ -82,14 +82,14 @@ jobs:
           echo "image=code-marketplace:scan" >> "$GITHUB_OUTPUT"
 
       - name: Run Trivy vulnerability scanner (table output for logs)
-        uses: aquasecurity/trivy-action@cf5c088a69634cd13ccddc735d7926162c31f9a6 # v0.34.2
+        uses: aquasecurity/trivy-action@c07df6fec6fa692e6fd1200d50aaa1fdd66f03c8 # v0.34.2
         with:
           image-ref: ${{ steps.build.outputs.image }}
           format: "table"
           severity: "LOW,MEDIUM,HIGH,CRITICAL"
 
       - name: Run Trivy vulnerability scanner (SARIF output for GitHub)
-        uses: aquasecurity/trivy-action@cf5c088a69634cd13ccddc735d7926162c31f9a6 # v0.34.2
+        uses: aquasecurity/trivy-action@c07df6fec6fa692e6fd1200d50aaa1fdd66f03c8 # v0.34.2
         with:
           image-ref: ${{ steps.build.outputs.image }}
           format: "sarif"
@@ -97,7 +97,7 @@ jobs:
           severity: "LOW,MEDIUM,HIGH,CRITICAL"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: "trivy-results.sarif"
           category: "Trivy"
